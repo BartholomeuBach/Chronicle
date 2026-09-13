@@ -441,5 +441,3 @@ Chronicle is intended to be open-source and available for experimentation, modif
   ⏳ <i>Because even hell needs a clock.</i> 😈
 </p>
 ```
-
-Eu acho que essa versão já tem bem mais **“cara de projeto da comunidade”**: visual, personalidade, piadas internas leves e uma identidade clara do Bartholomeu sem perder a parte técnica.
