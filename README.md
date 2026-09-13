@@ -1,6 +1,3 @@
-Claro — aqui vai uma versão consolidada do README, já com mais identidade visual, slogan, overview, features e a visão maior do Narrative System Engine.
-
-````md
 <p align="center">
   <img src="./assets/repo_page.png" width="800">
 </p>
