@@ -1,8 +1,5 @@
 <p align="center">
-  <!-- Add Chronicle cover image here -->
-  <!-- Example:
-  <img src="./assets/cover.png" width="800">
-  -->
+  <img src="./assets/repo_page.png" width="100%">
 </p>
 
 # Chronicle ⏳
