@@ -3,10 +3,11 @@ import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-deci
 import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
 import { formatChronicleDateTime } from "../chronicle/state/format-chronicle-date-time.js";
 import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
+import { syncChronicleStoryCard, type StoryCardRuntime } from "./story-cards/sync-chronicle-story-card.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export interface ChroniclePersistentRuntimeState { readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
-export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; }
+export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly storyCards?: StoryCardRuntime; }
 export interface ChronicleRuntime {
   onInput(text: string, context: AIDungeonHookContext): string;
   onContext(text: string, context: AIDungeonHookContext): string;
@@ -44,6 +45,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: [] });
       const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: "low" });
       context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
+      if (context.storyCards !== undefined) syncChronicleStoryCard(context.storyCards, recorded.state, recorded.ledger);
       return nonEmptyText(text);
     }
   });
