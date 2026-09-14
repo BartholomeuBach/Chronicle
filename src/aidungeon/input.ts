@@ -1,9 +1,11 @@
 import { nonEmptyText } from "./runtime.js";
 
 declare const text: string;
+declare const state: Record<string, unknown>;
+declare const info: { actionCount?: number };
 
 const modifier = (value: string) => ({
-  text: globalThis.ChronicleAIDungeon?.onInput(value) ?? nonEmptyText(value)
+  text: globalThis.ChronicleAIDungeon?.onInput(value, { state, actionCount: info.actionCount }) ?? nonEmptyText(value)
 });
 
 modifier(text);

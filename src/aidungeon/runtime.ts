@@ -1,13 +1,16 @@
-/**
- * Minimal AI Dungeon hook boundary for Phase 0.
- *
- * Chronicle domain behavior is intentionally not implemented here. The initial
- * adapters preserve text and give later phases one replaceable integration seam.
- */
+import { createTemporalLedger, type TemporalLedger } from "../chronicle/ledger/temporal-ledger.js";
+import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-decision.js";
+import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
+import { formatChronicleDateTime } from "../chronicle/state/format-chronicle-date-time.js";
+import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
+
+export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
+export interface ChroniclePersistentRuntimeState { readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
+export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; }
 export interface ChronicleRuntime {
-  onInput(text: string): string;
-  onContext(text: string): string;
-  onOutput(text: string): string;
+  onInput(text: string, context: AIDungeonHookContext): string;
+  onContext(text: string, context: AIDungeonHookContext): string;
+  onOutput(text: string, context: AIDungeonHookContext): string;
 }
 
 /**
@@ -18,8 +21,42 @@ export function nonEmptyText(text: string): string {
   return text === "" ? "\u200B" : text;
 }
 
-export const passthroughRuntime: ChronicleRuntime = Object.freeze({
-  onInput: nonEmptyText,
-  onContext: nonEmptyText,
-  onOutput: nonEmptyText
-});
+export function initializeChronicleRuntime(state: Record<string, unknown>, chronicleState: ChronicleState): void {
+  state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState, ledger: createTemporalLedger(), pendingPlayerAction: undefined });
+}
+
+export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRuntime {
+  return Object.freeze({
+    onInput(text: string, context: AIDungeonHookContext) {
+      const current = read(context.state);
+      if (current !== undefined) context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ ...current, pendingPlayerAction: text });
+      return nonEmptyText(text);
+    },
+    onContext(text: string, context: AIDungeonHookContext) {
+      const current = read(context.state);
+      if (current === undefined) return nonEmptyText(text);
+      const projection = `Chronicle temporal state: ${formatChronicleDateTime(current.chronicleState.currentDateTime)}`;
+      return nonEmptyText(text.includes(projection) ? text : `${projection}\n${text}`);
+    },
+    onOutput(text: string, context: AIDungeonHookContext) {
+      const current = read(context.state);
+      if (current === undefined || reasoner === undefined) return nonEmptyText(text);
+      const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: [] });
+      const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: "low" });
+      context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
+      return nonEmptyText(text);
+    }
+  });
+}
+
+export const passthroughRuntime: ChronicleRuntime = createChronicleRuntime();
+
+function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {
+  const value = state[CHRONICLE_RUNTIME_STATE_KEY];
+  return value !== null && typeof value === "object" && "chronicleState" in value && "ledger" in value ? value as ChroniclePersistentRuntimeState : undefined;
+}
+function beatId(actionCount: number | undefined, text: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16_777_619);
+  return `${actionCount ?? "unknown"}:${(hash >>> 0).toString(16)}`;
+}
