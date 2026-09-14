@@ -11,7 +11,8 @@ export interface ChronicleDateTimeInput {
 /** A normalized fictional datetime in the Gregorian D0 calendar. */
 export interface ChronicleDateTime extends Readonly<ChronicleDateTimeInput> {}
 
-/** The minimal canonical Chronicle state for the first domain slice. */
+/** The canonical D0 state, including a bounded idempotency boundary. */
 export interface ChronicleState {
   readonly currentDateTime: ChronicleDateTime;
+  readonly processedBeatIds: readonly string[];
 }
