@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local agent guidance and working documentation
+AGENTS.md
+agent_documentation/
