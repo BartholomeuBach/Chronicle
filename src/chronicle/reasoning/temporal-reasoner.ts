@@ -20,6 +20,11 @@ export interface TemporalReasonerDecision {
   readonly mode: TemporalMode;
   readonly rationale: string;
   readonly confidence?: "high" | "medium" | "low";
+  /**
+   * Allows an auditable zero-delta decision only when the completed narrative
+   * itself contains temporal evidence. Omit or set false for a neutral beat.
+   */
+  readonly hasTemporalEvidence?: boolean;
 }
 
 /**
