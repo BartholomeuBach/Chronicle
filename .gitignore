@@ -144,4 +144,5 @@ vite.config.ts.timestamp-*
 
 # Local agent guidance and working documentation
 AGENTS.md
+CLAUDE.md
 agent_documentation/
