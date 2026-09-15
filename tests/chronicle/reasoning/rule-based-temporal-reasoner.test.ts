@@ -20,4 +20,14 @@ describe("ruleBasedTemporalReasoner", () => {
     expect(decide("Mais tarde, a porta abre.")).toMatchObject({ elapsedTime: { minutes: 5 }, confidence: "low" });
     expect(decide("Ele pensa em seu passado.")).toMatchObject({ elapsedTime: { days: 0, hours: 0, minutes: 0, seconds: 0 }, mode: "conservative-fallback" });
   });
+
+  it("handles named day transitions and does not treat intention as completion", () => {
+    expect(decide("By sunset, the road finally ends.")).toMatchObject({ elapsedTime: { hours: 19, minutes: 30 }, mode: "explicit-transition" });
+    expect(decide("He lies down, but cannot sleep.", "I am going to sleep now")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
+  });
+
+  it("does not invent a full duration for ambiguous travel or combat", () => {
+    expect(decide("They begin their journey through the mountains.", "I travel north")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
+    expect(decide("The battle rages on.", "I attack")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
+  });
 });

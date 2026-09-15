@@ -9,8 +9,9 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
   const explicit = findExplicitDuration(narrative);
   if (explicit !== undefined) return decision(explicit, "explicit-duration", "Explicit elapsed duration in completed narrative.", "high");
 
-  if (/(ao amanhecer|raios de sol|despertou|morning|sunrise|woke up)/.test(narrative)) {
-    return decision(untilMorning(input.currentState.currentDateTime), "explicit-transition", "Completed narrative establishes a transition to morning.", "medium");
+  const transitionHour = findTransitionHour(narrative);
+  if (transitionHour !== undefined) {
+    return decision(untilHour(input.currentState.currentDateTime, transitionHour), "explicit-transition", "Completed narrative establishes a named time-of-day transition.", "medium");
   }
   if (/(durante a noite|throughout the night|passou a noite|overnight)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 8, minutes: 0, seconds: 0 }), "summary-or-time-skip", "Completed narrative summarizes an overnight passage.", "medium");
@@ -43,10 +44,18 @@ function findExplicitDuration(text: string): ElapsedTime | undefined {
   return createElapsedTime({ days: value, hours: 0, minutes: 0, seconds: 0 });
 }
 
-function untilMorning(dateTime: TemporalReasonerInput["currentState"]["currentDateTime"]): ElapsedTime {
+function findTransitionHour(text: string): number | undefined {
+  if (/(ao amanhecer|raios de sol|despertou|morning|sunrise|woke up)/.test(text)) return 6;
+  if (/(at noon|by noon|meio-dia|midday)/.test(text)) return 12;
+  if (/(at sunset|by sunset|entardecer|sunset)/.test(text)) return 18;
+  if (/(at nightfall|night fell|anoitecer|nightfall)/.test(text)) return 21;
+  return undefined;
+}
+
+function untilHour(dateTime: TemporalReasonerInput["currentState"]["currentDateTime"], targetHour: number): ElapsedTime {
   const now = dateTime.hour * 3_600 + dateTime.minute * 60 + dateTime.second;
-  const morning = 6 * 3_600;
-  const remaining = now < morning ? morning - now : 86_400 - now + morning;
+  const target = targetHour * 3_600;
+  const remaining = now < target ? target - now : 86_400 - now + target;
   return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: remaining });
 }
 

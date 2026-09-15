@@ -1,4 +1,6 @@
 import { passthroughRuntime } from "./runtime.js";
+import { ruleBasedTemporalReasoner } from "../chronicle/reasoning/rule-based-temporal-reasoner.js";
+import { createChronicleRuntime } from "./runtime.js";
 
 declare global {
   // AI Dungeon evaluates Library before the other script tabs.
@@ -6,4 +8,4 @@ declare global {
   var ChronicleAIDungeon: typeof passthroughRuntime | undefined;
 }
 
-globalThis.ChronicleAIDungeon = passthroughRuntime;
+globalThis.ChronicleAIDungeon = createChronicleRuntime(ruleBasedTemporalReasoner);
