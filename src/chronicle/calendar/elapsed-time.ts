@@ -44,6 +44,11 @@ export function createElapsedTime(input: ElapsedTimeInput): ElapsedTime {
   });
 }
 
+/** Returns whether a normalized duration leaves the fictional clock unchanged. */
+export function isZeroElapsedTime(elapsedTime: ElapsedTime): boolean {
+  return elapsedTime.days === 0 && elapsedTime.hours === 0 && elapsedTime.minutes === 0 && elapsedTime.seconds === 0;
+}
+
 function assertNonNegativeSafeIntegers(input: ElapsedTimeInput): void {
   for (const [name, value] of Object.entries(input)) {
     if (!Number.isSafeInteger(value) || value < 0) {

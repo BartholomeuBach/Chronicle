@@ -1,5 +1,7 @@
 import { advanceChronicleDateTime } from "../calendar/advance-chronicle-date-time.js";
 import type { ElapsedTime } from "../calendar/elapsed-time.js";
+import { createElapsedTime } from "../calendar/elapsed-time.js";
+import { isNormalizedGregorianDateTime } from "../calendar/normalize-gregorian-date-time.js";
 import { isTemporalMode, type TemporalMode } from "../reasoning/temporal-mode.js";
 import type { ChronicleDateTime, ChronicleState } from "../state/chronicle-state.js";
 
@@ -87,9 +89,13 @@ export function isTemporalConfidence(value: unknown): value is TemporalConfidenc
 }
 
 /** Validates persisted Ledger data before an integration adapter uses it. */
-export function isTemporalLedger(value: unknown): value is TemporalLedger {
-  return value !== null && typeof value === "object" && Array.isArray((value as TemporalLedger).records) &&
-    (value as TemporalLedger).records.every(isTemporalLedgerRecord);
+export function isTemporalLedger(value: unknown, expectedCurrentDateTime?: ChronicleDateTime): value is TemporalLedger {
+  if (value === null || typeof value !== "object" || !Array.isArray((value as TemporalLedger).records)) return false;
+  const records = (value as TemporalLedger).records;
+  if (records.length > MAX_TEMPORAL_LEDGER_RECORDS || !records.every(isTemporalLedgerRecord)) return false;
+  if (new Set(records.map((record) => record.beatId)).size !== records.length) return false;
+  if (records.some((record, index) => index > 0 && !sameDateTime(records[index - 1].resultingState.currentDateTime, record.previousState.currentDateTime))) return false;
+  return expectedCurrentDateTime === undefined || records.length === 0 || sameDateTime(records[records.length - 1].resultingState.currentDateTime, expectedCurrentDateTime);
 }
 
 function isTemporalLedgerRecord(value: unknown): value is TemporalLedgerRecord {
@@ -99,15 +105,23 @@ function isTemporalLedgerRecord(value: unknown): value is TemporalLedgerRecord {
     isText(record.beatId, 128) && isText(record.actionInterpretation, 280) && isText(record.reasoning, 500) &&
     isTemporalConfidence(record.confidence) && isTemporalMode(record.mode) &&
     isDateTime(record.previousState?.currentDateTime) && isDateTime(record.resultingState?.currentDateTime) &&
-    isElapsedTime(record.elapsedTime);
+    isElapsedTime(record.elapsedTime) &&
+    sameDateTime(advanceChronicleDateTime(record.previousState.currentDateTime, record.elapsedTime), record.resultingState.currentDateTime);
 }
 
 function isDateTime(value: unknown): value is ChronicleDateTime {
-  return value !== null && typeof value === "object" && Object.values(value).length === 6 && Object.values(value).every(Number.isSafeInteger);
+  return isNormalizedGregorianDateTime(value);
 }
 
 function isElapsedTime(value: unknown): value is ElapsedTime {
-  return value !== null && typeof value === "object" && Object.values(value).length === 4 && Object.values(value).every((part) => Number.isSafeInteger(part) && part >= 0);
+  if (value === null || typeof value !== "object" || Object.keys(value).length !== 4) return false;
+  try {
+    const normalized = createElapsedTime(value as ElapsedTime);
+    return normalized.days === (value as ElapsedTime).days && normalized.hours === (value as ElapsedTime).hours &&
+      normalized.minutes === (value as ElapsedTime).minutes && normalized.seconds === (value as ElapsedTime).seconds;
+  } catch {
+    return false;
+  }
 }
 
 function isText(value: unknown, maxLength: number): value is string {

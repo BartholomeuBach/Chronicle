@@ -1,4 +1,5 @@
 import type { TemporalReasonerDecision } from "../reasoning/temporal-reasoner.js";
+import { isZeroElapsedTime } from "../calendar/elapsed-time.js";
 import { applyTemporalDecision } from "../state/apply-temporal-decision.js";
 import type { ChronicleState } from "../state/chronicle-state.js";
 import {
@@ -30,6 +31,10 @@ export function recordTemporalDecision(input: RecordTemporalDecisionInput): Reco
   const application = applyTemporalDecision(input.state, input.beatId, input.decision);
   if (!application.applied) {
     return Object.freeze({ state: input.state, ledger: input.ledger, record: undefined, applied: false });
+  }
+
+  if (isZeroElapsedTime(input.decision.elapsedTime) && input.decision.hasTemporalEvidence !== true) {
+    return Object.freeze({ state: application.state, ledger: input.ledger, record: undefined, applied: true });
   }
 
   const record = createTemporalLedgerRecord({

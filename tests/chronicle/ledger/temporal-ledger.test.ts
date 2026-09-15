@@ -122,4 +122,40 @@ describe("Temporal Ledger", () => {
     expect(first.ledger.records).toHaveLength(1);
     expect(retry).toMatchObject({ applied: false, state: first.state, ledger: first.ledger, record: undefined });
   });
+
+  it("keeps a neutral zero-delta beat out of the Ledger while retaining idempotency", () => {
+    const zeroDecision: TemporalReasonerDecision = {
+      elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }),
+      mode: "conservative-fallback",
+      rationale: "No temporal evidence in the completed narrative."
+    };
+    const first = recordTemporalDecision({
+      state: before(), ledger: createTemporalLedger(), beatId: "output-neutral", decision: zeroDecision,
+      actionInterpretation: zeroDecision.rationale, confidence: "low"
+    });
+    const retry = recordTemporalDecision({
+      state: first.state, ledger: first.ledger, beatId: "output-neutral", decision,
+      actionInterpretation: decision.rationale, confidence: "high"
+    });
+
+    expect(first).toMatchObject({ applied: true, record: undefined, ledger: { records: [] } });
+    expect(first.state.processedBeatIds).toContain("output-neutral");
+    expect(retry).toMatchObject({ applied: false, ledger: first.ledger });
+  });
+
+  it("records a zero delta when the reasoner identifies explicit temporal evidence", () => {
+    const zeroEvidenceDecision: TemporalReasonerDecision = {
+      elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }),
+      mode: "explicit-duration",
+      rationale: "The narrative explicitly states that zero minutes passed.",
+      hasTemporalEvidence: true
+    };
+    const recorded = recordTemporalDecision({
+      state: before(), ledger: createTemporalLedger(), beatId: "output-zero-evidence", decision: zeroEvidenceDecision,
+      actionInterpretation: zeroEvidenceDecision.rationale, confidence: "high"
+    });
+
+    expect(recorded.record).toMatchObject({ beatId: "output-zero-evidence", elapsedTime: { minutes: 0 } });
+    expect(recorded.ledger.records).toHaveLength(1);
+  });
 });

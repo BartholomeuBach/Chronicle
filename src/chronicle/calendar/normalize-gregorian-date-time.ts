@@ -41,6 +41,20 @@ export function normalizeGregorianDateTime(input: ChronicleDateTimeInput): Chron
   });
 }
 
+/** Checks that persisted datetime components are already canonical D0 values. */
+export function isNormalizedGregorianDateTime(value: unknown): value is ChronicleDateTime {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<ChronicleDateTime>;
+  if (Object.keys(candidate).length !== 6 || !Object.values(candidate).every(Number.isSafeInteger)) return false;
+  try {
+    const normalized = normalizeGregorianDateTime(candidate as ChronicleDateTimeInput);
+    return normalized.year === candidate.year && normalized.month === candidate.month && normalized.day === candidate.day &&
+      normalized.hour === candidate.hour && normalized.minute === candidate.minute && normalized.second === candidate.second;
+  } catch {
+    return false;
+  }
+}
+
 function assertSafeIntegerComponents(input: ChronicleDateTimeInput): void {
   for (const [name, value] of Object.entries(input)) {
     if (!Number.isSafeInteger(value)) {
