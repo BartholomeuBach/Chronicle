@@ -19,8 +19,7 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
   if (/(mais tarde|later|depois de um tempo|after a while)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 5, seconds: 0 }), "conservative-fallback", "Narrative gives a vague later-time expression.", "low");
   }
-  const combined = `${input.playerAction ?? ""} ${input.completedNarrative}`.toLowerCase();
-  const prior = input.activityPriors.find((candidate) => candidate.requiresContext !== true && matchesActivity(combined, candidate.activity));
+  const prior = input.activityPriors.find((candidate) => candidate.requiresContext !== true && matchesActivity(narrative, candidate.activity));
   if (prior !== undefined) return decision(prior.suggestedElapsedTime, "scene-progression", "Activity prior used only because stronger temporal evidence is absent.", "low");
   if (/(correu|walked|ran|atravessando|travelling|traveled)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 1, seconds: 0 }), "scene-progression", "Completed narrative shows a continuing physical scene, not completed travel.", "low");

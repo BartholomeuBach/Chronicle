@@ -14,4 +14,9 @@ describe("default activity-prior catalog", () => {
     expect(ruleBasedTemporalReasoner.decide(input)).toMatchObject({ elapsedTime: { minutes: 10 }, mode: "scene-progression" });
     expect(ruleBasedTemporalReasoner.decide({ ...input, completedNarrative: "After 30 minutes, she cleans the room." })).toMatchObject({ elapsedTime: { minutes: 30 }, mode: "explicit-duration" });
   });
+
+  it("does not use a prior when only the player intended the activity", () => {
+    const input = { currentState: initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 12, minute: 0, second: 0 }), playerAction: "I clean the room.", completedNarrative: "A guard stops her before she begins.", activityPriors: DEFAULT_ACTIVITY_PRIORS };
+    expect(ruleBasedTemporalReasoner.decide(input)).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
+  });
 });
