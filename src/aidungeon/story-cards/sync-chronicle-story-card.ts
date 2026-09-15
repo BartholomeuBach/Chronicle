@@ -1,6 +1,7 @@
 import {
   createChronicleStoryCardProjection,
   findChronicleStoryCardIndex,
+  findChronicleStoryCardIndices,
   type AiDungeonStoryCard
 } from "./chronicle-story-card.js";
 import type { TemporalLedger } from "../../chronicle/ledger/temporal-ledger.js";
@@ -11,14 +12,20 @@ export interface StoryCardRuntime {
   readonly storyCards: AiDungeonStoryCard[];
   addStoryCard(keys: string, entry: string, type: string): number | false;
   updateStoryCard(index: number, keys: string, entry: string, type: string): void;
+  removeStoryCard?: (index: number) => void;
 }
 
-export type ChronicleStoryCardSyncStatus = "created" | "updated" | "recovered";
+export type ChronicleStoryCardSyncStatus = "created" | "updated" | "recovered" | "repaired" | "duplicate-detected";
 
 export interface ChronicleStoryCardSyncResult {
   readonly status: ChronicleStoryCardSyncStatus;
   readonly cardIndex: number;
   readonly notesWriteAttempted: boolean;
+  readonly duplicateCount: number;
+}
+
+export interface ChronicleStoryCardSyncOptions {
+  readonly repairDuplicates?: boolean;
 }
 
 /**
@@ -29,21 +36,33 @@ export interface ChronicleStoryCardSyncResult {
 export function syncChronicleStoryCard(
   runtime: StoryCardRuntime,
   state: ChronicleState,
-  ledger: TemporalLedger
+  ledger: TemporalLedger,
+  options: ChronicleStoryCardSyncOptions = {}
 ): ChronicleStoryCardSyncResult {
   const projection = createChronicleStoryCardProjection(state, ledger);
-  const existingIndex = findChronicleStoryCardIndex(runtime.storyCards);
+  const matchingIndices = findChronicleStoryCardIndices(runtime.storyCards);
+  const existingIndex = matchingIndices[0];
+
+  if (matchingIndices.length > 1 && options.repairDuplicates === true) {
+    if (runtime.removeStoryCard === undefined) {
+      return Object.freeze({ status: "duplicate-detected", cardIndex: existingIndex, notesWriteAttempted: false, duplicateCount: matchingIndices.length });
+    }
+    for (const index of matchingIndices.slice(1).reverse()) runtime.removeStoryCard(index);
+    runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
+    writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
+    return Object.freeze({ status: "repaired", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
+  }
 
   if (existingIndex !== undefined) {
     runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
     writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
-    return Object.freeze({ status: "updated", cardIndex: existingIndex, notesWriteAttempted: true });
+    return Object.freeze({ status: matchingIndices.length > 1 ? "duplicate-detected" : "updated", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
   }
 
   const createdIndex = runtime.addStoryCard(projection.keys, projection.entry, projection.type);
   if (createdIndex !== false && runtime.storyCards[createdIndex] !== undefined) {
     writeExperimentalNotes(runtime.storyCards[createdIndex], projection.notes);
-    return Object.freeze({ status: "created", cardIndex: createdIndex, notesWriteAttempted: true });
+    return Object.freeze({ status: "created", cardIndex: createdIndex, notesWriteAttempted: true, duplicateCount: 1 });
   }
 
   const recoveredIndex = findChronicleStoryCardIndex(runtime.storyCards);
@@ -53,7 +72,7 @@ export function syncChronicleStoryCard(
 
   runtime.updateStoryCard(recoveredIndex, projection.keys, projection.entry, projection.type);
   writeExperimentalNotes(runtime.storyCards[recoveredIndex], projection.notes);
-  return Object.freeze({ status: "recovered", cardIndex: recoveredIndex, notesWriteAttempted: true });
+  return Object.freeze({ status: "recovered", cardIndex: recoveredIndex, notesWriteAttempted: true, duplicateCount: 1 });
 }
 
 function writeExperimentalNotes(card: AiDungeonStoryCard, notes: string): void {

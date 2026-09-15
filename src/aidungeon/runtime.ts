@@ -2,11 +2,15 @@ import { createTemporalLedger, isTemporalLedger, type TemporalLedger } from "../
 import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-decision.js";
 import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
 import { DEFAULT_ACTIVITY_PRIORS } from "../chronicle/reasoning/activity-prior-catalog.js";
-import { formatChronicleDateTime } from "../chronicle/state/format-chronicle-date-time.js";
+import { renderChronicleTemporalContext } from "../chronicle/state/render-chronicle-temporal-context.js";
 import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
 import { syncChronicleStoryCard, type StoryCardRuntime } from "./story-cards/sync-chronicle-story-card.js";
+import { findChronicleStoryCardIndices } from "./story-cards/chronicle-story-card.js";
 import { readChronicleConfiguration, runtimeDateTime } from "./story-cards/chronicle-configuration.js";
 import { initializeChronicleState } from "../chronicle/state/initialize-chronicle-state.js";
+import { isNormalizedGregorianDateTime } from "../chronicle/calendar/normalize-gregorian-date-time.js";
+import { MAX_PROCESSED_BEAT_IDS } from "../chronicle/state/apply-temporal-decision.js";
+import { CHRONICLE_NOTIFICATION_STATE_KEY, renderChronicleTimeNotification } from "./chronicle-time-notification.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
@@ -35,6 +39,7 @@ export function initializeChronicleRuntime(state: Record<string, unknown>, chron
 export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRuntime {
   return Object.freeze({
     onInput(text: string, context: AIDungeonHookContext) {
+      clearChronicleNotification(context.state);
       if (!enabled(context)) return nonEmptyText(text);
       const current = ensureInitialized(context);
       if (current !== undefined) context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ ...current, pendingPlayerAction: text });
@@ -44,21 +49,46 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       if (!enabled(context)) return nonEmptyText(text);
       const current = ensureInitialized(context);
       if (current === undefined) return nonEmptyText(text);
-      const projection = `Chronicle temporal state: ${formatChronicleDateTime(current.chronicleState.currentDateTime)}`;
+      syncProjection(context, current, false);
+      const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
       if (context.maxChars !== undefined && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
       return nonEmptyText(text.includes(projection) ? text : `${projection}\n${text}`);
     },
     onOutput(text: string, context: AIDungeonHookContext) {
+      clearChronicleNotification(context.state);
       if (!enabled(context)) return nonEmptyText(text);
       const current = ensureInitialized(context);
       if (current === undefined || reasoner === undefined) return nonEmptyText(text);
       const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
       const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
       context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
-      if (context.storyCards !== undefined) syncChronicleStoryCard(context.storyCards, recorded.state, recorded.ledger);
+      const notification = renderChronicleTimeNotification(current.chronicleState.currentDateTime, recorded.state.currentDateTime);
+      if (notification !== undefined) setChronicleNotification(context.state, notification);
+      syncProjection(context, { ...current, chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined }, true);
       return nonEmptyText(text);
     }
   });
+}
+
+function clearChronicleNotification(state: Record<string, unknown>): void {
+  const notification = state[CHRONICLE_NOTIFICATION_STATE_KEY];
+  if (typeof notification === "string" && state.message === notification) delete state.message;
+  delete state[CHRONICLE_NOTIFICATION_STATE_KEY];
+}
+function setChronicleNotification(state: Record<string, unknown>, notification: string): void {
+  state.message = notification;
+  state[CHRONICLE_NOTIFICATION_STATE_KEY] = notification;
+}
+
+function syncProjection(context: AIDungeonHookContext, current: ChroniclePersistentRuntimeState, force: boolean): void {
+  if (context.storyCards === undefined) return;
+  const configuration = readChronicleConfiguration(context.storyCards.storyCards);
+  const matchingCards = findChronicleStoryCardIndices(context.storyCards.storyCards);
+  if (!force && configuration.repairChronicleCard !== true && matchingCards.length < 2) return;
+  const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard });
+  if (sync.status === "duplicate-detected") {
+    context.state[CHRONICLE_RUNTIME_ERROR_KEY] = "Chronicle has duplicate temporal-state cards. Set Repair Chronicle Card: true in the configuration card to repair them explicitly.";
+  }
 }
 
 export const passthroughRuntime: ChronicleRuntime = createChronicleRuntime();
@@ -80,6 +110,10 @@ function ensureInitialized(context: AIDungeonHookContext): ChroniclePersistentRu
   if (context.storyCards === undefined) return undefined;
   const configuration = readChronicleConfiguration(context.storyCards.storyCards);
   if (!configuration.enabled) return undefined;
+  if (configuration.error !== undefined) {
+    context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `Chronicle paused: ${configuration.error}`;
+    return undefined;
+  }
   initializeChronicleRuntime(context.state, initializeChronicleState(configuration.initialDateTime ?? runtimeDateTime()));
   return read(context.state);
 }
@@ -88,9 +122,11 @@ function isValidRuntimeState(value: unknown): value is ChroniclePersistentRuntim
   const candidate = value as Partial<ChroniclePersistentRuntimeState>;
   const dateTime = candidate.chronicleState?.currentDateTime;
   return candidate.schemaVersion === CHRONICLE_RUNTIME_SCHEMA_VERSION &&
-    dateTime !== undefined && Object.values(dateTime).every(Number.isSafeInteger) &&
-    Array.isArray(candidate.chronicleState?.processedBeatIds) && candidate.chronicleState.processedBeatIds.every((id) => typeof id === "string") &&
-    isTemporalLedger(candidate.ledger) &&
+    dateTime !== undefined && isNormalizedGregorianDateTime(dateTime) &&
+    Array.isArray(candidate.chronicleState?.processedBeatIds) && candidate.chronicleState.processedBeatIds.length <= MAX_PROCESSED_BEAT_IDS &&
+    candidate.chronicleState.processedBeatIds.every((id) => typeof id === "string" && id.trim().length > 0) &&
+    new Set(candidate.chronicleState.processedBeatIds).size === candidate.chronicleState.processedBeatIds.length &&
+    isTemporalLedger(candidate.ledger, dateTime) &&
     (candidate.pendingPlayerAction === undefined || typeof candidate.pendingPlayerAction === "string");
 }
 function beatId(actionCount: number | undefined, text: string): string {

@@ -1,5 +1,6 @@
 import type { TemporalLedger, TemporalLedgerRecord } from "../../chronicle/ledger/temporal-ledger.js";
 import { formatChronicleDateTime } from "../../chronicle/state/format-chronicle-date-time.js";
+import { renderChronicleTemporalContext } from "../../chronicle/state/render-chronicle-temporal-context.js";
 import type { ChronicleState } from "../../chronicle/state/chronicle-state.js";
 
 export const CHRONICLE_STORY_CARD_KEY = "chronicle-temporal-state";
@@ -27,7 +28,7 @@ export interface ChronicleStoryCardProjection {
  * Ledger history is deliberately absent from the entry.
  */
 export function renderChronicleStoryCardEntry(state: ChronicleState): string {
-  return `Chronicle temporal state: ${formatChronicleDateTime(state.currentDateTime)}`;
+  return renderChronicleTemporalContext(state.currentDateTime);
 }
 
 /**
@@ -62,8 +63,16 @@ export function createChronicleStoryCardProjection(
 
 /** Locates the dedicated card without matching unrelated card text. */
 export function findChronicleStoryCardIndex(storyCards: readonly AiDungeonStoryCard[]): number | undefined {
-  const index = storyCards.findIndex((card) => card.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY));
-  return index === -1 ? undefined : index;
+  return findChronicleStoryCardIndices(storyCards)[0];
+}
+
+/** Returns every dedicated Chronicle projection card, in current array order. */
+export function findChronicleStoryCardIndices(storyCards: readonly AiDungeonStoryCard[]): readonly number[] {
+  const indices: number[] = [];
+  storyCards.forEach((card, index) => {
+    if (card.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY)) indices.push(index);
+  });
+  return Object.freeze(indices);
 }
 
 function renderLedgerRecord(record: TemporalLedgerRecord): object {

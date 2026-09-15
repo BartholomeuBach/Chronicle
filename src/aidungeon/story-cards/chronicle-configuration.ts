@@ -2,22 +2,50 @@ import type { ChronicleDateTimeInput } from "../../chronicle/state/chronicle-sta
 import type { AiDungeonStoryCard } from "./chronicle-story-card.js";
 
 export const CHRONICLE_CONFIGURATION_KEY = "chronicle-configuration";
+export const CHRONICLE_CONFIGURATION_NOTES_TEMPLATE = `# Chronicle configuration
+# IMPORTANT: do not change initialization fields during an active story.
+# Existing Chronicle state intentionally remains unchanged. Start a new adventure
+# or use a future explicit reset workflow when you need a new timeline.
+Chronicle Enabled: true
+Initialization Mode: Automatic
+# Manual fields are optional; blank fields use the current New York time.
+# Start Year:
+# Start Month:
+# Start Day:
+# Start Hour:
+# Start Minute:
+# Start Second:
+# Set true only to explicitly remove duplicate Chronicle temporal-state cards.
+Repair Chronicle Card: false`;
 export type ChronicleInitializationMode = "automatic" | "manual";
-export interface ChronicleConfiguration { readonly enabled: boolean; readonly mode: ChronicleInitializationMode; readonly initialDateTime?: ChronicleDateTimeInput; }
+export interface ChronicleConfiguration { readonly enabled: boolean; readonly mode: ChronicleInitializationMode; readonly initialDateTime?: ChronicleDateTimeInput; readonly repairChronicleCard: boolean; readonly error?: string; }
 
 /** Reads the user-facing setup card. A missing card deliberately means disabled. */
-export function readChronicleConfiguration(cards: readonly AiDungeonStoryCard[]): ChronicleConfiguration {
+export function readChronicleConfiguration(cards: readonly AiDungeonStoryCard[], currentDateTime?: ChronicleDateTimeInput): ChronicleConfiguration {
   const card = cards.find((candidate) => candidate.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_CONFIGURATION_KEY));
-  if (card === undefined) return Object.freeze({ enabled: false, mode: "automatic" });
+  if (card === undefined) return Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false });
   const values = parseLines(card.description ?? "");
   const enabled = (values["chronicle enabled"] ?? "true").toLowerCase() === "true";
   const mode = (values["initialization mode"] ?? "automatic").toLowerCase() === "manual" ? "manual" : "automatic";
-  const initialDateTime = mode === "manual" ? readManualDateTime(values) : undefined;
-  return Object.freeze({ enabled, mode, initialDateTime });
+  const repairChronicleCard = (values["repair chronicle card"] ?? "false").toLowerCase() === "true";
+  const manual = mode === "manual" ? readManualDateTime(values, currentDateTime ?? runtimeDateTime()) : undefined;
+  return Object.freeze({ enabled, mode, initialDateTime: manual?.initialDateTime, repairChronicleCard, error: manual?.error });
 }
 
+/** Uses the America/New_York civil time only for first-run convenience defaults. */
 export function runtimeDateTime(now: Date = new Date()): ChronicleDateTimeInput {
-  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate(), hour: now.getHours(), minute: now.getMinutes(), second: now.getSeconds() };
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  return { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute"), second: value("second") };
 }
 
 function parseLines(notes: string): Record<string, string> {
@@ -28,10 +56,20 @@ function parseLines(notes: string): Record<string, string> {
   }
   return values;
 }
-function readManualDateTime(values: Record<string, string>): ChronicleDateTimeInput | undefined {
-  const names = ["start year", "start month", "start day"] as const;
-  if (names.some((name) => values[name] === undefined)) return undefined;
-  const number = (name: string, fallback = 0) => values[name] === undefined ? fallback : Number(values[name]);
-  const input = { year: number("start year"), month: number("start month"), day: number("start day"), hour: number("start hour"), minute: number("start minute"), second: number("start second") };
-  return Object.values(input).every(Number.isSafeInteger) ? input : undefined;
+function readManualDateTime(values: Record<string, string>, currentDateTime: ChronicleDateTimeInput): Pick<ChronicleConfiguration, "initialDateTime" | "error"> {
+  const fields = [
+    ["start year", "year"], ["start month", "month"], ["start day", "day"],
+    ["start hour", "hour"], ["start minute", "minute"], ["start second", "second"]
+  ] as const;
+  const input: ChronicleDateTimeInput = { ...currentDateTime };
+  for (const [field, component] of fields) {
+    const raw = values[field];
+    if (raw === undefined || raw === "") continue;
+    const parsed = Number(raw);
+    if (!Number.isSafeInteger(parsed)) {
+      return Object.freeze({ error: `Manual Chronicle configuration has an invalid ${field} value.` });
+    }
+    input[component] = parsed;
+  }
+  return Object.freeze({ initialDateTime: Object.freeze(input) });
 }

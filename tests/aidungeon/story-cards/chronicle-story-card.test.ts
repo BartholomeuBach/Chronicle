@@ -6,6 +6,7 @@ import { initializeChronicleState } from "../../../src/chronicle/state/index.js"
 import {
   createChronicleStoryCardProjection,
   findChronicleStoryCardIndex,
+  findChronicleStoryCardIndices,
   MAX_STORY_CARD_LEDGER_RECORDS,
   syncChronicleStoryCard,
   type AiDungeonStoryCard,
@@ -48,7 +49,7 @@ describe("Chronicle Story Card projection", () => {
     const recorded = ledgerWithOneRecord();
     const projection = createChronicleStoryCardProjection(recorded.state, recorded.ledger);
 
-    expect(projection.entry).toBe("Chronicle temporal state: 2026/04/13 19:47:00");
+    expect(projection.entry).toBe("[Chronicle]\nCurrent story time: 2026/04/13 19:47:00.\nTime of day: evening.");
     expect(projection.entry).not.toContain("walks to the inn");
     expect(JSON.parse(projection.notes)).toMatchObject({
       chronicleTemporalLedger: { schemaVersion: 1, records: [{ beatId: "output-001", confidence: "high" }] }
@@ -58,6 +59,7 @@ describe("Chronicle Story Card projection", () => {
   it("finds only the dedicated Chronicle card", () => {
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle", entry: "", type: "story" }])).toBeUndefined();
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle-temporal-state", entry: "", type: "story" }])).toBe(0);
+    expect(findChronicleStoryCardIndices([{ keys: "chronicle-temporal-state", entry: "", type: "story" }, { keys: "other", entry: "", type: "story" }, { keys: "chronicle-temporal-state", entry: "", type: "story" }])).toEqual([0, 2]);
   });
 
   it("creates, updates, and overwrites malformed Notes from canonical data", () => {
@@ -95,6 +97,26 @@ describe("Chronicle Story Card projection", () => {
     expect(cards).toHaveLength(1);
   });
 
+  it("keeps duplicate cards untouched until an explicit repair removes all but the canonical card", () => {
+    const recorded = ledgerWithOneRecord();
+    const cards: AiDungeonStoryCard[] = [
+      { keys: "chronicle-temporal-state", entry: "old canonical", type: "story" },
+      { keys: "chronicle-temporal-state", entry: "duplicate", type: "story" }
+    ];
+    const runtime: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard: () => false,
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; },
+      removeStoryCard(index) { cards.splice(index, 1); }
+    };
+
+    expect(syncChronicleStoryCard(runtime, recorded.state, recorded.ledger)).toMatchObject({ status: "duplicate-detected", duplicateCount: 2 });
+    expect(cards).toHaveLength(2);
+    expect(syncChronicleStoryCard(runtime, recorded.state, recorded.ledger, { repairDuplicates: true })).toMatchObject({ status: "repaired", duplicateCount: 2 });
+    expect(cards).toHaveLength(1);
+    expect(cards[0].keys).toBe("chronicle-temporal-state");
+  });
+
   it("limits the Notes projection even when the canonical Ledger is larger", () => {
     let recorded = ledgerWithOneRecord();
     for (let index = 1; index <= MAX_STORY_CARD_LEDGER_RECORDS; index += 1) {
@@ -102,7 +124,7 @@ describe("Chronicle Story Card projection", () => {
         state: recorded.state,
         ledger: recorded.ledger,
         beatId: `output-${index}`,
-        decision: { ...decision, elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }) },
+        decision: { ...decision, elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), hasTemporalEvidence: true },
         actionInterpretation: "No additional time.",
         confidence: "low"
       });
