@@ -8,11 +8,13 @@ import { createElapsedTime, type ElapsedTime, type ElapsedTimeInput } from "../c
 export interface ActivityPrior {
   readonly activity: string;
   readonly suggestedElapsedTime: ElapsedTime;
+  readonly requiresContext?: boolean;
 }
 
 export interface ActivityPriorInput {
   readonly activity: string;
   readonly suggestedElapsedTime: ElapsedTimeInput;
+  readonly requiresContext?: boolean;
 }
 
 export function createActivityPrior(input: ActivityPriorInput): ActivityPrior {
@@ -23,6 +25,7 @@ export function createActivityPrior(input: ActivityPriorInput): ActivityPrior {
 
   return Object.freeze({
     activity,
-    suggestedElapsedTime: createElapsedTime(input.suggestedElapsedTime)
+    suggestedElapsedTime: createElapsedTime(input.suggestedElapsedTime),
+    requiresContext: input.requiresContext
   });
 }

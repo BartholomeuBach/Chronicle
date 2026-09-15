@@ -1,6 +1,7 @@
 import { createTemporalLedger, type TemporalLedger } from "../chronicle/ledger/temporal-ledger.js";
 import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-decision.js";
 import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
+import { DEFAULT_ACTIVITY_PRIORS } from "../chronicle/reasoning/activity-prior-catalog.js";
 import { formatChronicleDateTime } from "../chronicle/state/format-chronicle-date-time.js";
 import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
 import { syncChronicleStoryCard, type StoryCardRuntime } from "./story-cards/sync-chronicle-story-card.js";
@@ -42,7 +43,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
     onOutput(text: string, context: AIDungeonHookContext) {
       const current = read(context.state);
       if (current === undefined || reasoner === undefined) return nonEmptyText(text);
-      const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: [] });
+      const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
       const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
       context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
       if (context.storyCards !== undefined) syncChronicleStoryCard(context.storyCards, recorded.state, recorded.ledger);

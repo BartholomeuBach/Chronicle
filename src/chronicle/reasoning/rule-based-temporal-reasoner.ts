@@ -19,12 +19,17 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 5, seconds: 0 }), "conservative-fallback", "Narrative gives a vague later-time expression.", "low");
   }
   const combined = `${input.playerAction ?? ""} ${input.completedNarrative}`.toLowerCase();
-  const prior = input.activityPriors.find((candidate) => combined.includes(candidate.activity.toLowerCase()));
+  const prior = input.activityPriors.find((candidate) => candidate.requiresContext !== true && matchesActivity(combined, candidate.activity));
   if (prior !== undefined) return decision(prior.suggestedElapsedTime, "scene-progression", "Activity prior used only because stronger temporal evidence is absent.", "low");
   if (/(correu|walked|ran|atravessando|travelling|traveled)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 1, seconds: 0 }), "scene-progression", "Completed narrative shows a continuing physical scene, not completed travel.", "low");
   }
   return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), "conservative-fallback", "No defensible elapsed-time evidence in the completed narrative.", "low");
+}
+
+function matchesActivity(text: string, activity: string): boolean {
+  const escaped = activity.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`).test(text);
 }
 
 function findExplicitDuration(text: string): ElapsedTime | undefined {
