@@ -29,7 +29,7 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
 
 function matchesActivity(text: string, activity: string): boolean {
   const escaped = activity.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`).test(text);
+  return new RegExp(`\\b${escaped}(?:s|es|ed|ing)?\\b`).test(text);
 }
 
 function findExplicitDuration(text: string): ElapsedTime | undefined {
