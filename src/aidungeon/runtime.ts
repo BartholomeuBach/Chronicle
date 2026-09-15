@@ -12,7 +12,7 @@ export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
 export const CHRONICLE_RUNTIME_SCHEMA_VERSION = 1;
 export interface ChroniclePersistentRuntimeState { readonly schemaVersion: typeof CHRONICLE_RUNTIME_SCHEMA_VERSION; readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
-export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly storyCards?: StoryCardRuntime; }
+export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly maxChars?: number; readonly memoryLength?: number; readonly storyCards?: StoryCardRuntime; }
 export interface ChronicleRuntime {
   onInput(text: string, context: AIDungeonHookContext): string;
   onContext(text: string, context: AIDungeonHookContext): string;
@@ -45,6 +45,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       const current = ensureInitialized(context);
       if (current === undefined) return nonEmptyText(text);
       const projection = `Chronicle temporal state: ${formatChronicleDateTime(current.chronicleState.currentDateTime)}`;
+      if (context.maxChars !== undefined && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
       return nonEmptyText(text.includes(projection) ? text : `${projection}\n${text}`);
     },
     onOutput(text: string, context: AIDungeonHookContext) {

@@ -27,6 +27,14 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(JSON.stringify(state)).toContain("I walk.");
   });
 
+  it("preserves existing Context when the Chronicle projection would exceed the budget", () => {
+    const state: Record<string, unknown> = {};
+    initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
+    const cards = [configurationCard()];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+    expect(createChronicleRuntime().onContext("Existing context", { state, maxChars: 20, storyCards })).toBe("Existing context");
+  });
+
   it("processes an Output through the configured Reasoner and refreshes the Story Card", () => {
     const state: Record<string, unknown> = {};
     initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
