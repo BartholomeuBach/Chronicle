@@ -1,4 +1,4 @@
-import { createTemporalLedger, type TemporalLedger } from "../chronicle/ledger/temporal-ledger.js";
+import { createTemporalLedger, isTemporalLedger, type TemporalLedger } from "../chronicle/ledger/temporal-ledger.js";
 import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-decision.js";
 import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
 import { DEFAULT_ACTIVITY_PRIORS } from "../chronicle/reasoning/activity-prior-catalog.js";
@@ -89,7 +89,7 @@ function isValidRuntimeState(value: unknown): value is ChroniclePersistentRuntim
   return candidate.schemaVersion === CHRONICLE_RUNTIME_SCHEMA_VERSION &&
     dateTime !== undefined && Object.values(dateTime).every(Number.isSafeInteger) &&
     Array.isArray(candidate.chronicleState?.processedBeatIds) && candidate.chronicleState.processedBeatIds.every((id) => typeof id === "string") &&
-    Array.isArray(candidate.ledger?.records) &&
+    isTemporalLedger(candidate.ledger) &&
     (candidate.pendingPlayerAction === undefined || typeof candidate.pendingPlayerAction === "string");
 }
 function beatId(actionCount: number | undefined, text: string): string {

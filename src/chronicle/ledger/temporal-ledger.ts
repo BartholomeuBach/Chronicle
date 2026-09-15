@@ -1,6 +1,6 @@
 import { advanceChronicleDateTime } from "../calendar/advance-chronicle-date-time.js";
 import type { ElapsedTime } from "../calendar/elapsed-time.js";
-import type { TemporalMode } from "../reasoning/temporal-mode.js";
+import { isTemporalMode, type TemporalMode } from "../reasoning/temporal-mode.js";
 import type { ChronicleDateTime, ChronicleState } from "../state/chronicle-state.js";
 
 export const TEMPORAL_LEDGER_SCHEMA_VERSION = 1;
@@ -84,6 +84,34 @@ export function appendTemporalLedger(ledger: TemporalLedger, record: TemporalLed
 
 export function isTemporalConfidence(value: unknown): value is TemporalConfidence {
   return typeof value === "string" && (TEMPORAL_CONFIDENCE_LEVELS as readonly string[]).includes(value);
+}
+
+/** Validates persisted Ledger data before an integration adapter uses it. */
+export function isTemporalLedger(value: unknown): value is TemporalLedger {
+  return value !== null && typeof value === "object" && Array.isArray((value as TemporalLedger).records) &&
+    (value as TemporalLedger).records.every(isTemporalLedgerRecord);
+}
+
+function isTemporalLedgerRecord(value: unknown): value is TemporalLedgerRecord {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Partial<TemporalLedgerRecord>;
+  return record.schemaVersion === TEMPORAL_LEDGER_SCHEMA_VERSION &&
+    isText(record.beatId, 128) && isText(record.actionInterpretation, 280) && isText(record.reasoning, 500) &&
+    isTemporalConfidence(record.confidence) && isTemporalMode(record.mode) &&
+    isDateTime(record.previousState?.currentDateTime) && isDateTime(record.resultingState?.currentDateTime) &&
+    isElapsedTime(record.elapsedTime);
+}
+
+function isDateTime(value: unknown): value is ChronicleDateTime {
+  return value !== null && typeof value === "object" && Object.values(value).length === 6 && Object.values(value).every(Number.isSafeInteger);
+}
+
+function isElapsedTime(value: unknown): value is ElapsedTime {
+  return value !== null && typeof value === "object" && Object.values(value).length === 4 && Object.values(value).every((part) => Number.isSafeInteger(part) && part >= 0);
+}
+
+function isText(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }
 
 function assertTemporalConfidence(value: unknown): asserts value is TemporalConfidence {

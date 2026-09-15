@@ -2,6 +2,7 @@ export {
   appendTemporalLedger,
   createTemporalLedger,
   createTemporalLedgerRecord,
+  isTemporalLedger,
   isTemporalConfidence,
   MAX_TEMPORAL_LEDGER_RECORDS,
   TEMPORAL_CONFIDENCE_LEVELS,

@@ -52,4 +52,12 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(state.chronicleRuntime).toEqual({ chronicleState: {} });
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("paused");
   });
+
+  it("pauses when a persisted Ledger record is malformed", () => {
+    const state: Record<string, unknown> = { chronicleRuntime: { schemaVersion: 1, chronicleState: { currentDateTime: { year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }, processedBeatIds: [] }, ledger: { records: [{ schemaVersion: 1, beatId: "bad", previousState: {}, elapsedTime: {}, mode: "bad", reasoning: "x", confidence: "high", resultingState: {} }] } } };
+    const cards = [configurationCard()];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+    createChronicleRuntime().onContext("Base context.", { state, storyCards });
+    expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("invalid");
+  });
 });
