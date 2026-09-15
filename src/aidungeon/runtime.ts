@@ -43,7 +43,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       const current = read(context.state);
       if (current === undefined || reasoner === undefined) return nonEmptyText(text);
       const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: [] });
-      const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: "low" });
+      const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
       context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
       if (context.storyCards !== undefined) syncChronicleStoryCard(context.storyCards, recorded.state, recorded.ledger);
       return nonEmptyText(text);

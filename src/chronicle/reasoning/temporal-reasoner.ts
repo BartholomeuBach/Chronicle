@@ -19,6 +19,7 @@ export interface TemporalReasonerDecision {
   readonly elapsedTime: ElapsedTime;
   readonly mode: TemporalMode;
   readonly rationale: string;
+  readonly confidence?: "high" | "medium" | "low";
 }
 
 /**
