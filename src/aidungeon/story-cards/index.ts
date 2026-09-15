@@ -8,6 +8,7 @@ export {
   renderChronicleStoryCardNotes
 } from "./chronicle-story-card.js";
 export { syncChronicleStoryCard } from "./sync-chronicle-story-card.js";
+export { CHRONICLE_CONFIGURATION_KEY, readChronicleConfiguration, runtimeDateTime } from "./chronicle-configuration.js";
 export type {
   AiDungeonStoryCard,
   ChronicleStoryCardProjection
@@ -17,3 +18,4 @@ export type {
   ChronicleStoryCardSyncStatus,
   StoryCardRuntime
 } from "./sync-chronicle-story-card.js";
+export type { ChronicleConfiguration, ChronicleInitializationMode } from "./chronicle-configuration.js";

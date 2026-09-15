@@ -5,6 +5,8 @@ import { DEFAULT_ACTIVITY_PRIORS } from "../chronicle/reasoning/activity-prior-c
 import { formatChronicleDateTime } from "../chronicle/state/format-chronicle-date-time.js";
 import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
 import { syncChronicleStoryCard, type StoryCardRuntime } from "./story-cards/sync-chronicle-story-card.js";
+import { readChronicleConfiguration, runtimeDateTime } from "./story-cards/chronicle-configuration.js";
+import { initializeChronicleState } from "../chronicle/state/initialize-chronicle-state.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export interface ChroniclePersistentRuntimeState { readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
@@ -30,18 +32,21 @@ export function initializeChronicleRuntime(state: Record<string, unknown>, chron
 export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRuntime {
   return Object.freeze({
     onInput(text: string, context: AIDungeonHookContext) {
-      const current = read(context.state);
+      if (!enabled(context)) return nonEmptyText(text);
+      const current = ensureInitialized(context);
       if (current !== undefined) context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ ...current, pendingPlayerAction: text });
       return nonEmptyText(text);
     },
     onContext(text: string, context: AIDungeonHookContext) {
-      const current = read(context.state);
+      if (!enabled(context)) return nonEmptyText(text);
+      const current = ensureInitialized(context);
       if (current === undefined) return nonEmptyText(text);
       const projection = `Chronicle temporal state: ${formatChronicleDateTime(current.chronicleState.currentDateTime)}`;
       return nonEmptyText(text.includes(projection) ? text : `${projection}\n${text}`);
     },
     onOutput(text: string, context: AIDungeonHookContext) {
-      const current = read(context.state);
+      if (!enabled(context)) return nonEmptyText(text);
+      const current = ensureInitialized(context);
       if (current === undefined || reasoner === undefined) return nonEmptyText(text);
       const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
       const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
@@ -57,6 +62,16 @@ export const passthroughRuntime: ChronicleRuntime = createChronicleRuntime();
 function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {
   const value = state[CHRONICLE_RUNTIME_STATE_KEY];
   return value !== null && typeof value === "object" && "chronicleState" in value && "ledger" in value ? value as ChroniclePersistentRuntimeState : undefined;
+}
+function enabled(context: AIDungeonHookContext): boolean { return context.storyCards !== undefined && readChronicleConfiguration(context.storyCards.storyCards).enabled; }
+function ensureInitialized(context: AIDungeonHookContext): ChroniclePersistentRuntimeState | undefined {
+  const existing = read(context.state);
+  if (existing !== undefined) return existing;
+  if (context.storyCards === undefined) return undefined;
+  const configuration = readChronicleConfiguration(context.storyCards.storyCards);
+  if (!configuration.enabled) return undefined;
+  initializeChronicleRuntime(context.state, initializeChronicleState(configuration.initialDateTime ?? runtimeDateTime()));
+  return read(context.state);
 }
 function beatId(actionCount: number | undefined, text: string): string {
   let hash = 2_166_136_261;
