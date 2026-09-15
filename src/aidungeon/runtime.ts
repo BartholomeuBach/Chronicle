@@ -9,7 +9,9 @@ import { readChronicleConfiguration, runtimeDateTime } from "./story-cards/chron
 import { initializeChronicleState } from "../chronicle/state/initialize-chronicle-state.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
-export interface ChroniclePersistentRuntimeState { readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
+export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
+export const CHRONICLE_RUNTIME_SCHEMA_VERSION = 1;
+export interface ChroniclePersistentRuntimeState { readonly schemaVersion: typeof CHRONICLE_RUNTIME_SCHEMA_VERSION; readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
 export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly storyCards?: StoryCardRuntime; }
 export interface ChronicleRuntime {
   onInput(text: string, context: AIDungeonHookContext): string;
@@ -26,7 +28,8 @@ export function nonEmptyText(text: string): string {
 }
 
 export function initializeChronicleRuntime(state: Record<string, unknown>, chronicleState: ChronicleState): void {
-  state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState, ledger: createTemporalLedger(), pendingPlayerAction: undefined });
+  state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState, ledger: createTemporalLedger(), pendingPlayerAction: undefined });
+  delete state[CHRONICLE_RUNTIME_ERROR_KEY];
 }
 
 export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRuntime {
@@ -50,7 +53,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       if (current === undefined || reasoner === undefined) return nonEmptyText(text);
       const decision = reasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
       const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
-      context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
+      context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
       if (context.storyCards !== undefined) syncChronicleStoryCard(context.storyCards, recorded.state, recorded.ledger);
       return nonEmptyText(text);
     }
@@ -61,17 +64,33 @@ export const passthroughRuntime: ChronicleRuntime = createChronicleRuntime();
 
 function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {
   const value = state[CHRONICLE_RUNTIME_STATE_KEY];
-  return value !== null && typeof value === "object" && "chronicleState" in value && "ledger" in value ? value as ChroniclePersistentRuntimeState : undefined;
+  if (value === undefined) return undefined;
+  if (!isValidRuntimeState(value)) return undefined;
+  return value;
 }
 function enabled(context: AIDungeonHookContext): boolean { return context.storyCards !== undefined && readChronicleConfiguration(context.storyCards.storyCards).enabled; }
 function ensureInitialized(context: AIDungeonHookContext): ChroniclePersistentRuntimeState | undefined {
   const existing = read(context.state);
   if (existing !== undefined) return existing;
+  if (context.state[CHRONICLE_RUNTIME_STATE_KEY] !== undefined) {
+    context.state[CHRONICLE_RUNTIME_ERROR_KEY] = "Chronicle paused: persisted runtime state is invalid or incompatible.";
+    return undefined;
+  }
   if (context.storyCards === undefined) return undefined;
   const configuration = readChronicleConfiguration(context.storyCards.storyCards);
   if (!configuration.enabled) return undefined;
   initializeChronicleRuntime(context.state, initializeChronicleState(configuration.initialDateTime ?? runtimeDateTime()));
   return read(context.state);
+}
+function isValidRuntimeState(value: unknown): value is ChroniclePersistentRuntimeState {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<ChroniclePersistentRuntimeState>;
+  const dateTime = candidate.chronicleState?.currentDateTime;
+  return candidate.schemaVersion === CHRONICLE_RUNTIME_SCHEMA_VERSION &&
+    dateTime !== undefined && Object.values(dateTime).every(Number.isSafeInteger) &&
+    Array.isArray(candidate.chronicleState?.processedBeatIds) && candidate.chronicleState.processedBeatIds.every((id) => typeof id === "string") &&
+    Array.isArray(candidate.ledger?.records) &&
+    (candidate.pendingPlayerAction === undefined || typeof candidate.pendingPlayerAction === "string");
 }
 function beatId(actionCount: number | undefined, text: string): string {
   let hash = 2_166_136_261;

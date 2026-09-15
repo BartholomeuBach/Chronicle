@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createChronicleRuntime, initializeChronicleRuntime, nonEmptyText } from "../src/aidungeon/runtime.js";
+import { CHRONICLE_RUNTIME_ERROR_KEY, createChronicleRuntime, initializeChronicleRuntime, nonEmptyText } from "../src/aidungeon/runtime.js";
 import { initializeChronicleState } from "../src/chronicle/state/index.js";
 import { createElapsedTime } from "../src/chronicle/calendar/index.js";
 import type { TemporalReasoner } from "../src/chronicle/reasoning/index.js";
@@ -42,5 +42,14 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(runtime.onOutput("Fifteen minutes pass.", { state, actionCount: 1, storyCards })).toBe("Fifteen minutes pass.");
     expect(cards[1].entry).toBe("Chronicle temporal state: 2026/04/13 19:47:00");
     expect(cards[1].description).toContain("Fifteen minutes passed.");
+  });
+
+  it("pauses safely when persisted Chronicle state is invalid", () => {
+    const state: Record<string, unknown> = { chronicleRuntime: { chronicleState: {} } };
+    const cards = [configurationCard()];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+    expect(createChronicleRuntime().onContext("Base context.", { state, storyCards })).toBe("Base context.");
+    expect(state.chronicleRuntime).toEqual({ chronicleState: {} });
+    expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("paused");
   });
 });
