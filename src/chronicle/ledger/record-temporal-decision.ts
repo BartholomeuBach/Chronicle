@@ -1,6 +1,6 @@
 import type { TemporalReasonerDecision } from "../reasoning/temporal-reasoner.js";
 import { isZeroElapsedTime } from "../calendar/elapsed-time.js";
-import { applyTemporalDecision } from "../state/apply-temporal-decision.js";
+import { applyTemporalDecision, type TemporalDecisionRejectionReason } from "../state/apply-temporal-decision.js";
 import type { ChronicleState } from "../state/chronicle-state.js";
 import {
   appendTemporalLedger,
@@ -24,13 +24,14 @@ export interface RecordedTemporalDecision {
   readonly ledger: TemporalLedger;
   readonly record: TemporalLedgerRecord | undefined;
   readonly applied: boolean;
+  readonly rejectionReason?: TemporalDecisionRejectionReason;
 }
 
 /** Applies a new decision and its audit record atomically at the domain boundary. */
 export function recordTemporalDecision(input: RecordTemporalDecisionInput): RecordedTemporalDecision {
   const application = applyTemporalDecision(input.state, input.beatId, input.decision);
   if (!application.applied) {
-    return Object.freeze({ state: input.state, ledger: input.ledger, record: undefined, applied: false });
+    return Object.freeze({ state: input.state, ledger: input.ledger, record: undefined, applied: false, rejectionReason: application.rejectionReason });
   }
 
   if (isZeroElapsedTime(input.decision.elapsedTime) && input.decision.hasTemporalEvidence !== true) {
@@ -45,7 +46,8 @@ export function recordTemporalDecision(input: RecordTemporalDecisionInput): Reco
     mode: input.decision.mode,
     reasoning: input.decision.rationale,
     confidence: input.confidence,
-    resultingState: application.state
+    resultingState: application.state,
+    signalStatus: input.decision.signalStatus
   });
 
   return Object.freeze({

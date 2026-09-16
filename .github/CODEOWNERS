@@ -1,0 +1,5 @@
+# Every file in this repository requires review from the listed owner(s)
+# before it can be merged into a protected branch. Pair this with a branch
+# protection rule on `main` that has "Require review from Code Owners"
+# enabled — see PROJECT_PLANNING.md / this repo's Settings > Branches.
+* @BartholomeuBach

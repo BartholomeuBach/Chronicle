@@ -11,6 +11,7 @@ describe("TemporalMode", () => {
     const modes: readonly TemporalMode[] = TEMPORAL_MODES;
 
     expect(modes).toEqual([
+      "model-signaled",
       "explicit-duration",
       "explicit-transition",
       "scene-progression",

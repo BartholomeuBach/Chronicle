@@ -1,0 +1,23 @@
+name: Check
+
+# Runs Chronicle's full local acceptance gate (typecheck, tests, build,
+# artifact verification) on every push and pull request targeting main/dev.
+# Intended to be wired into main's branch protection rule as a required
+# status check, so a PR cannot merge with a red build.
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check

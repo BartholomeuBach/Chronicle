@@ -3,6 +3,7 @@ import type { ElapsedTime } from "../calendar/elapsed-time.js";
 import { createElapsedTime } from "../calendar/elapsed-time.js";
 import { isNormalizedGregorianDateTime } from "../calendar/normalize-gregorian-date-time.js";
 import { isTemporalMode, type TemporalMode } from "../reasoning/temporal-mode.js";
+import { assertTemporalSignalStatus, isTemporalSignalStatus, type TemporalSignalStatus } from "../reasoning/temporal-signal-status.js";
 import type { ChronicleDateTime, ChronicleState } from "../state/chronicle-state.js";
 
 export const TEMPORAL_LEDGER_SCHEMA_VERSION = 1;
@@ -27,6 +28,8 @@ export interface TemporalLedgerRecord {
   readonly reasoning: string;
   readonly confidence: TemporalConfidence;
   readonly resultingState: TemporalStateSnapshot;
+  /** Traceability for the optional model-signaled evidence tier (D-026); absent when that tier did not participate. */
+  readonly signalStatus?: TemporalSignalStatus;
 }
 
 export interface TemporalLedgerRecordInput {
@@ -38,6 +41,7 @@ export interface TemporalLedgerRecordInput {
   readonly reasoning: string;
   readonly confidence: TemporalConfidence;
   readonly resultingState: ChronicleState;
+  readonly signalStatus?: TemporalSignalStatus;
 }
 
 export interface TemporalLedger {
@@ -54,6 +58,7 @@ export function createTemporalLedgerRecord(input: TemporalLedgerRecordInput): Te
   const actionInterpretation = requireText(input.actionInterpretation, "actionInterpretation", 280);
   const reasoning = requireText(input.reasoning, "reasoning", 500);
   assertTemporalConfidence(input.confidence);
+  if (input.signalStatus !== undefined) assertTemporalSignalStatus(input.signalStatus);
 
   const expectedDateTime = advanceChronicleDateTime(input.previousState.currentDateTime, input.elapsedTime);
   if (!sameDateTime(expectedDateTime, input.resultingState.currentDateTime)) {
@@ -69,7 +74,8 @@ export function createTemporalLedgerRecord(input: TemporalLedgerRecordInput): Te
     mode: input.mode,
     reasoning,
     confidence: input.confidence,
-    resultingState: snapshot(input.resultingState)
+    resultingState: snapshot(input.resultingState),
+    signalStatus: input.signalStatus
   });
 }
 
@@ -104,6 +110,7 @@ function isTemporalLedgerRecord(value: unknown): value is TemporalLedgerRecord {
   return record.schemaVersion === TEMPORAL_LEDGER_SCHEMA_VERSION &&
     isText(record.beatId, 128) && isText(record.actionInterpretation, 280) && isText(record.reasoning, 500) &&
     isTemporalConfidence(record.confidence) && isTemporalMode(record.mode) &&
+    (record.signalStatus === undefined || isTemporalSignalStatus(record.signalStatus)) &&
     isDateTime(record.previousState?.currentDateTime) && isDateTime(record.resultingState?.currentDateTime) &&
     isElapsedTime(record.elapsedTime) &&
     sameDateTime(advanceChronicleDateTime(record.previousState.currentDateTime, record.elapsedTime), record.resultingState.currentDateTime);

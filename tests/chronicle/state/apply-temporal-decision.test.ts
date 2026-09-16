@@ -53,4 +53,28 @@ describe("applyTemporalDecision", () => {
       "beatId must contain non-whitespace text"
     );
   });
+
+  it("refuses (rather than throws) a delta that would move the calendar outside the supported year range", () => {
+    const nearBoundary = initializeChronicleState({ year: 9999, month: 12, day: 30, hour: 12, minute: 0, second: 0 });
+    const overflowing: TemporalReasonerDecision = {
+      elapsedTime: createElapsedTime({ days: 365, hours: 0, minutes: 0, seconds: 0 }),
+      mode: "model-signaled",
+      rationale: "Model-signaled multi-year skip near the calendar boundary."
+    };
+
+    const result = applyTemporalDecision(nearBoundary, "output-overflow", overflowing);
+
+    expect(result.applied).toBe(false);
+    expect(result.rejectionReason).toBe("unsupported-range");
+    expect(result.state).toBe(nearBoundary); // completely unchanged, not partially advanced
+    expect(result.state.processedBeatIds).toEqual([]); // not marked processed either
+  });
+
+  it("distinguishes an out-of-range rejection from an ordinary duplicate-beat retry", () => {
+    const first = applyTemporalDecision(initialState(), "output-001", decision(15));
+    expect(first.rejectionReason).toBeUndefined(); // applied, no rejection at all
+
+    const retry = applyTemporalDecision(first.state, "output-001", decision(15));
+    expect(retry.rejectionReason).toBe("duplicate-beat");
+  });
 });

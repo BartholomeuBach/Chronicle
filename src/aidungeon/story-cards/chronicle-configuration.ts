@@ -16,20 +16,26 @@ Initialization Mode: Automatic
 # Start Minute:
 # Start Second:
 # Set true only to explicitly remove duplicate Chronicle temporal-state cards.
-Repair Chronicle Card: false`;
+Repair Chronicle Card: false
+# Lets the AI Dungeon narrator itself signal elapsed time for a completed beat,
+# with its own high/medium/low confidence (D-026); Chronicle always falls back
+# to its deterministic rules when the signal is absent, malformed, ambiguous,
+# or contradicted by the story so far. Set false to use only the deterministic rules.
+AI Temporal Signal: true`;
 export type ChronicleInitializationMode = "automatic" | "manual";
-export interface ChronicleConfiguration { readonly enabled: boolean; readonly mode: ChronicleInitializationMode; readonly initialDateTime?: ChronicleDateTimeInput; readonly repairChronicleCard: boolean; readonly error?: string; }
+export interface ChronicleConfiguration { readonly enabled: boolean; readonly mode: ChronicleInitializationMode; readonly initialDateTime?: ChronicleDateTimeInput; readonly repairChronicleCard: boolean; readonly aiTemporalSignal: boolean; readonly error?: string; }
 
 /** Reads the user-facing setup card. A missing card deliberately means disabled. */
 export function readChronicleConfiguration(cards: readonly AiDungeonStoryCard[], currentDateTime?: ChronicleDateTimeInput): ChronicleConfiguration {
   const card = cards.find((candidate) => candidate.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_CONFIGURATION_KEY));
-  if (card === undefined) return Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false });
+  if (card === undefined) return Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false, aiTemporalSignal: true });
   const values = parseLines(card.description ?? "");
   const enabled = (values["chronicle enabled"] ?? "true").toLowerCase() === "true";
   const mode = (values["initialization mode"] ?? "automatic").toLowerCase() === "manual" ? "manual" : "automatic";
   const repairChronicleCard = (values["repair chronicle card"] ?? "false").toLowerCase() === "true";
+  const aiTemporalSignal = (values["ai temporal signal"] ?? "true").toLowerCase() === "true";
   const manual = mode === "manual" ? readManualDateTime(values, currentDateTime ?? runtimeDateTime()) : undefined;
-  return Object.freeze({ enabled, mode, initialDateTime: manual?.initialDateTime, repairChronicleCard, error: manual?.error });
+  return Object.freeze({ enabled, mode, initialDateTime: manual?.initialDateTime, repairChronicleCard, aiTemporalSignal, error: manual?.error });
 }
 
 /** Uses the America/New_York civil time only for first-run convenience defaults. */

@@ -3,6 +3,7 @@
  * The mode records the decision category; it does not perform inference.
  */
 export const TEMPORAL_MODES = [
+  "model-signaled",
   "explicit-duration",
   "explicit-transition",
   "scene-progression",

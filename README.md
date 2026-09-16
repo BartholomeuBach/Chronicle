@@ -119,6 +119,84 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 ---
 
+## Installation 🛠️
+
+> **Ready-to-install** means the four files below compile, pass Chronicle's full local test suite, and paste cleanly into AI Dungeon's script tabs. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below and [`agent_documentation/`](./agent_documentation) for the honest breakdown of what's proven versus what's still assumed.
+
+### Scenario Script Install Guide
+
+1. Clone or download this repository, then install dependencies and build the four AI Dungeon script files:
+   ```bash
+   npm install
+   npm run build
+   ```
+   This produces `dist/aidungeon/Library.js`, `Input.js`, `Context.js`, and `Output.js` — one self-contained file per AI Dungeon script tab, ready to paste as-is.
+2. Open the [AI Dungeon website](https://aidungeon.com/) on PC (or "View as Desktop" if you're on mobile-only).
+3. [Create a new Scenario](https://help.aidungeon.com/faq/what-are-scenarios), or open an existing one you want to add Chronicle to.
+4. Open the `DETAILS` tab, scroll down to `Scripting`, and toggle on **Scripts Enabled**.
+5. Select `EDIT SCRIPTS`.
+6. Select the `Library` tab on the left, delete everything in it, and paste in the full contents of `dist/aidungeon/Library.js`.
+7. Select the `Input` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Input.js`.
+8. Select the `Context` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Context.js`.
+9. Select the `Output` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Output.js`.
+10. Click the **SAVE** button.
+11. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**.
+
+### *And that's it — Chronicle is live.*
+
+Every turn played from that Scenario from now on runs through Chronicle.
+
+<sub>Chronicle stays off until the `chronicle-configuration` card exists — a missing card means "disabled," not broken.</sub>
+
+---
+
+### Configuration card
+
+Chronicle reads its settings from the `chronicle-configuration` Story Card's Notes. Paste this template in and edit only the values you want to change:
+
+```
+# Chronicle configuration
+# IMPORTANT: do not change initialization fields during an active story.
+# Existing Chronicle state intentionally remains unchanged. Start a new adventure
+# or use a future explicit reset workflow when you need a new timeline.
+Chronicle Enabled: true
+Initialization Mode: Automatic
+# Manual fields are optional; blank fields use the current New York time.
+# Start Year:
+# Start Month:
+# Start Day:
+# Start Hour:
+# Start Minute:
+# Start Second:
+# Set true only to explicitly remove duplicate Chronicle temporal-state cards.
+Repair Chronicle Card: false
+# Lets the AI Dungeon narrator itself signal elapsed time for a completed beat,
+# with its own high/medium/low confidence (D-026); Chronicle always falls back
+# to its deterministic rules when the signal is absent, malformed, ambiguous,
+# or contradicted by the story so far. Set false to use only the deterministic rules.
+AI Temporal Signal: true
+```
+
+| Field | What it does |
+|---|---|
+| `Chronicle Enabled` | `true`/`false`. Anything else is treated as `false`. |
+| `Initialization Mode` | `Automatic` starts the story clock at the real current time (America/New_York). `Manual` uses the Start Year/Month/Day/Hour/Minute/Second fields below it; any left blank fall back to the current time for that field. |
+| `Repair Chronicle Card` | Leave `false` normally. Chronicle detects duplicate temporal-state cards on its own without deleting anything; set this `true` only when you explicitly want duplicates removed, then set it back to `false`. |
+| `AI Temporal Signal` | Leave `true` to let the AI Dungeon narrator itself help estimate elapsed time, on top of Chronicle's deterministic rules. Set `false` to use only the deterministic rules. Either way, Chronicle never trusts the narrator blindly — see **How Chronicle Thinks** below. |
+
+⚠️ **Don't edit the Start Year/Month/Day/Hour/Minute/Second fields once your story has already started.** Chronicle intentionally never re-reads them after first use, so it won't silently reset an active timeline.
+
+---
+
+### Gameplay Tips
+
+- The `Library` tab must be pasted and saved before `Input`/`Context`/`Output` do anything meaningful — Chronicle assumes AI Dungeon evaluates `Library` first. If nothing seems to be happening, this is the first thing to check.
+- No `chronicle-configuration` card means Chronicle is simply off — that's the intended behavior, not a bug.
+- Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `chronicle-temporal-state` Story Card's Notes, for players who want to inspect how the clock got there.
+- Chronicle is early (see **Project Status** below) — check [`agent_documentation/05_known_limitations.md`](./agent_documentation/05_known_limitations.md) before assuming every narrative edge case is handled.
+
+---
+
 ## How Chronicle Thinks 🧠
 
 Chronicle is not just an action-duration lookup table.

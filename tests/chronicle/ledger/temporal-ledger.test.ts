@@ -4,6 +4,7 @@ import {
   appendTemporalLedger,
   createTemporalLedger,
   createTemporalLedgerRecord,
+  isTemporalLedger,
   MAX_TEMPORAL_LEDGER_RECORDS,
   recordTemporalDecision
 } from "../../../src/chronicle/ledger/index.js";
@@ -157,5 +158,61 @@ describe("Temporal Ledger", () => {
 
     expect(recorded.record).toMatchObject({ beatId: "output-zero-evidence", elapsedTime: { minutes: 0 } });
     expect(recorded.ledger.records).toHaveLength(1);
+  });
+
+  it("carries the model-signaled evidence tier's traceability (D-026) when the decision provides it", () => {
+    const signaledDecision: TemporalReasonerDecision = {
+      elapsedTime: createElapsedTime({ days: 0, hours: 9, minutes: 15, seconds: 0 }),
+      mode: "model-signaled",
+      rationale: "Model-reported elapsed time via injected directive; consistent with local guard.",
+      confidence: "high",
+      hasTemporalEvidence: true,
+      signalStatus: "accepted"
+    };
+    const recorded = recordTemporalDecision({
+      state: before(), ledger: createTemporalLedger(), beatId: "output-signaled", decision: signaledDecision,
+      actionInterpretation: signaledDecision.rationale, confidence: "high"
+    });
+
+    expect(recorded.record).toMatchObject({ mode: "model-signaled", signalStatus: "accepted" });
+  });
+
+  it("leaves signalStatus undefined for a decision that never evaluated the AI-signal tier", () => {
+    expect(recordFor().signalStatus).toBeUndefined();
+    expect(JSON.stringify(recordFor())).not.toContain("signalStatus");
+  });
+
+  it("rejects an unsupported signalStatus value", () => {
+    const previousState = before();
+    const resultingState = applyTemporalDecision(previousState, "output-001", decision).state;
+    expect(() =>
+      createTemporalLedgerRecord({
+        beatId: "output-001",
+        previousState,
+        actionInterpretation: "Walk.",
+        elapsedTime: decision.elapsedTime,
+        mode: decision.mode,
+        reasoning: decision.rationale,
+        confidence: "high",
+        resultingState,
+        signalStatus: "made-up-status" as never
+      })
+    ).toThrow("Unsupported temporal signal status");
+  });
+
+  it("still validates a persisted Ledger that carries signalStatus on its records", () => {
+    const record = createTemporalLedgerRecord({
+      beatId: "output-001",
+      previousState: before(),
+      actionInterpretation: "The party walks to the inn.",
+      elapsedTime: decision.elapsedTime,
+      mode: decision.mode,
+      reasoning: decision.rationale,
+      confidence: "high",
+      resultingState: applyTemporalDecision(before(), "output-001", decision).state,
+      signalStatus: "absent"
+    });
+    expect(isTemporalLedger({ records: [record] })).toBe(true);
+    expect(isTemporalLedger({ records: [{ ...record, signalStatus: "not-a-real-status" }] })).toBe(false);
   });
 });

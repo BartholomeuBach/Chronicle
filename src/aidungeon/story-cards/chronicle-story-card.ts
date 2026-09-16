@@ -82,6 +82,7 @@ function renderLedgerRecord(record: TemporalLedgerRecord): object {
     interpretation: record.actionInterpretation,
     elapsedTime: record.elapsedTime,
     mode: record.mode,
+    signalStatus: record.signalStatus,
     reasoning: record.reasoning,
     confidence: record.confidence,
     after: formatChronicleDateTime(record.resultingState.currentDateTime)
