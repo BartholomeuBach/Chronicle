@@ -1,4 +1,4 @@
-// Chronicle — paste this file into the AI Dungeon Context script tab.
+// Chronicle -- paste this file into the AI Dungeon Context script tab.
 "use strict";
 (() => {
   // src/aidungeon/non-empty-text.ts
@@ -22,17 +22,21 @@
 
   // src/aidungeon/context.ts
   var modifier = (value) => {
-    var _a, _b;
     const safeText = typeof value === "string" ? value : "";
-    return {
-      text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(safeText, {
-        state,
-        actionCount: info == null ? void 0 : info.actionCount,
-        maxChars: info == null ? void 0 : info.maxChars,
-        memoryLength: info == null ? void 0 : info.memoryLength,
-        storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-      })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-    };
+    if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+    const runtime = globalThis.ChronicleAIDungeon;
+    if (runtime === void 0) return { text: nonEmptyText(safeText) };
+    const actionCount = info === void 0 ? void 0 : info.actionCount;
+    const maxChars = info === void 0 ? void 0 : info.maxChars;
+    const memoryLength = info === void 0 ? void 0 : info.memoryLength;
+    const result = runtime.onContext(safeText, {
+      state,
+      actionCount,
+      maxChars,
+      memoryLength,
+      storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+    });
+    return { text: result };
   };
   modifier(text);
 })();

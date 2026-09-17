@@ -20,8 +20,12 @@ await Promise.all(
       format: "iife",
       target: "es2018",
       legalComments: "none",
+      // Plain ASCII deliberately: this is the very first line of every pasted
+      // artifact, and one non-ASCII character (previously an em dash) is one
+      // more thing that could be mangled by a lossy copy/paste path. Purely a
+      // defensive simplification -- see 05_known_limitations.md.
       banner: {
-        js: `// Chronicle — paste this file into the AI Dungeon ${name} script tab.`
+        js: `// Chronicle -- paste this file into the AI Dungeon ${name} script tab.`
       }
     })
   )

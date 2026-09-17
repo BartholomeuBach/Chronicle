@@ -1,4 +1,4 @@
-// Chronicle — paste this file into the AI Dungeon Library script tab.
+// Chronicle -- paste this file into the AI Dungeon Library script tab.
 "use strict";
 (() => {
   // src/chronicle/calendar/elapsed-time.ts

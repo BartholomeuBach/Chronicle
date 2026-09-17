@@ -60,11 +60,22 @@ then save again.**
 
 1. Open your Scenario's **Details -> Scripting**. Paste `Library.js` (from section 1 above) into
    the **Library** tab, then **save now**, before touching the other three tabs.
+
+   ⚠️ **For steps 2-4 below: use each code block's own copy button** (the clipboard icon in its
+   top-right corner on hover), not a manual click-and-drag text selection. Manually selecting text on
+   a rendered Markdown page risks grabbing a stray ` ``` ` fence marker along with the code — a single
+   extra ` ``` ` at the start or end of what you paste is enough to break the whole script. This
+   reproduces, byte for byte, the exact "Unexpected end of input" syntax error AI Dungeon reports when
+   starting an Adventure with a broken script — confirmed locally by deliberately mangling each
+   artifact this way and parsing the result (see `agent_documentation/05_known_limitations.md`).
+   After pasting each of Input/Context/Output, confirm the first line reads exactly `// Chronicle --
+   paste this file into the AI Dungeon <tab> script tab.` and the last line exactly `})();`, with no
+   ` ``` ` anywhere in between.
 2. Select the `Input` tab, delete everything in it, and paste this:
 
    <!-- chronicle:dist-embed:Input:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Input script tab.
+   // Chronicle -- paste this file into the AI Dungeon Input script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -88,15 +99,17 @@ then save again.**
 
      // src/aidungeon/input.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const result = runtime.onInput(safeText, {
+         state,
+         actionCount,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -107,7 +120,7 @@ then save again.**
 
    <!-- chronicle:dist-embed:Context:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Context script tab.
+   // Chronicle -- paste this file into the AI Dungeon Context script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -131,17 +144,21 @@ then save again.**
 
      // src/aidungeon/context.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           maxChars: info == null ? void 0 : info.maxChars,
-           memoryLength: info == null ? void 0 : info.memoryLength,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const maxChars = info === void 0 ? void 0 : info.maxChars;
+       const memoryLength = info === void 0 ? void 0 : info.memoryLength;
+       const result = runtime.onContext(safeText, {
+         state,
+         actionCount,
+         maxChars,
+         memoryLength,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -152,7 +169,7 @@ then save again.**
 
    <!-- chronicle:dist-embed:Output:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Output script tab.
+   // Chronicle -- paste this file into the AI Dungeon Output script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -176,15 +193,17 @@ then save again.**
 
      // src/aidungeon/output.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const result = runtime.onOutput(safeText, {
+         state,
+         actionCount,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -375,6 +394,17 @@ switched to `false` on the `Configure Chronicle` card.
   for every currently-known gap and its evidence level.
 
 ## 5. If something looks wrong
+
+**"This Scenario has a bug in its Input Modifier: Unexpected end of input"** (or the same message
+naming Context or Output) when you try to start an Adventure — before Chronicle ever runs at all:
+this is a script parse failure, not a Chronicle runtime error, so it won't appear as
+`state.chronicleRuntimeError`. Re-open that exact tab and re-paste its code using the code block's
+copy button from step 2 above, then check that the pasted content starts with `// Chronicle --` and
+ends with `})();`, with no stray ` ``` ` anywhere. A leftover Markdown fence marker from a manual copy
+is the one cause of this exact error message reproduced locally (see
+`agent_documentation/05_known_limitations.md`); it is not a defect in the published
+`dist/aidungeon/*.js` files themselves, which are verified parseable on every change
+(`npm run verify:dist:syntax`).
 
 Chronicle surfaces problems through a transient `state.chronicleRuntimeError` diagnostic rather than
 crashing a turn. If play feels wrong and you have script/state inspection access, check that key

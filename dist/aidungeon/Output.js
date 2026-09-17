@@ -1,4 +1,4 @@
-// Chronicle — paste this file into the AI Dungeon Output script tab.
+// Chronicle -- paste this file into the AI Dungeon Output script tab.
 "use strict";
 (() => {
   // src/aidungeon/non-empty-text.ts
@@ -22,15 +22,17 @@
 
   // src/aidungeon/output.ts
   var modifier = (value) => {
-    var _a, _b;
     const safeText = typeof value === "string" ? value : "";
-    return {
-      text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(safeText, {
-        state,
-        actionCount: info == null ? void 0 : info.actionCount,
-        storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-      })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-    };
+    if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+    const runtime = globalThis.ChronicleAIDungeon;
+    if (runtime === void 0) return { text: nonEmptyText(safeText) };
+    const actionCount = info === void 0 ? void 0 : info.actionCount;
+    const result = runtime.onOutput(safeText, {
+      state,
+      actionCount,
+      storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+    });
+    return { text: result };
   };
   modifier(text);
 })();

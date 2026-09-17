@@ -133,11 +133,21 @@ Chronicle exists so the narrator stops having to guess what time it is.
 4. Select `EDIT SCRIPTS`.
 5. Open [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js) on GitHub, click the **copy** icon in the top-right corner of the file (or select all and copy), then select the `Library` tab on the left, delete everything in it, and paste.
 6. **Click the SAVE button now**, before touching the other tabs. Input/Context/Output all depend on something Library sets up when it runs, so save it first to be safe.
+
+   ⚠️ **For steps 7-9 below: use each code block's own copy button** (the small clipboard icon that
+   appears in its top-right corner on hover), not a manual click-and-drag selection. Manually
+   selecting text on a rendered Markdown page risks grabbing a stray ` ``` ` fence marker along with
+   the code — a single extra ` ``` ` at the start or end of what you paste breaks the whole script
+   with a syntax error (confirmed locally by reproducing AI Dungeon's own "Unexpected end of input"
+   message this way — see `agent_documentation/05_known_limitations.md`). After pasting each of
+   Input/Context/Output, a quick sanity check: the first line should read exactly `// Chronicle --
+   paste this file into the AI Dungeon <tab> script tab.` and the last line exactly `})();`, with no
+   ` ``` ` anywhere in between.
 7. Select the `Input` tab, delete everything in it, and paste the code below:
 
    <!-- chronicle:dist-embed:Input:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Input script tab.
+   // Chronicle -- paste this file into the AI Dungeon Input script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -161,15 +171,17 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
      // src/aidungeon/input.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const result = runtime.onInput(safeText, {
+         state,
+         actionCount,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -180,7 +192,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
    <!-- chronicle:dist-embed:Context:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Context script tab.
+   // Chronicle -- paste this file into the AI Dungeon Context script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -204,17 +216,21 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
      // src/aidungeon/context.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           maxChars: info == null ? void 0 : info.maxChars,
-           memoryLength: info == null ? void 0 : info.memoryLength,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const maxChars = info === void 0 ? void 0 : info.maxChars;
+       const memoryLength = info === void 0 ? void 0 : info.memoryLength;
+       const result = runtime.onContext(safeText, {
+         state,
+         actionCount,
+         maxChars,
+         memoryLength,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -225,7 +241,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
    <!-- chronicle:dist-embed:Output:start -->
    ```js
-   // Chronicle — paste this file into the AI Dungeon Output script tab.
+   // Chronicle -- paste this file into the AI Dungeon Output script tab.
    "use strict";
    (() => {
      // src/aidungeon/non-empty-text.ts
@@ -249,15 +265,17 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
      // src/aidungeon/output.ts
      var modifier = (value) => {
-       var _a, _b;
        const safeText = typeof value === "string" ? value : "";
-       return {
-         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(safeText, {
-           state,
-           actionCount: info == null ? void 0 : info.actionCount,
-           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
-       };
+       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+       const runtime = globalThis.ChronicleAIDungeon;
+       if (runtime === void 0) return { text: nonEmptyText(safeText) };
+       const actionCount = info === void 0 ? void 0 : info.actionCount;
+       const result = runtime.onOutput(safeText, {
+         state,
+         actionCount,
+         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+       });
+       return { text: result };
      };
      modifier(text);
    })();
@@ -385,6 +403,7 @@ test is meant to help confirm) as a confound while you're checking whether Chron
 
 ### Gameplay Tips
 
+- **"This Scenario has a bug in its Input Modifier: Unexpected end of input"** (or the same for Context/Output) when you try to start an Adventure, before Chronicle ever gets to run: re-copy that exact tab's code using its code block's copy button (see the warning at step 6 above), then re-check that the pasted content starts with `// Chronicle --` and ends with `})();`, with no stray ` ``` ` anywhere. A leftover fence marker from a manual copy is the one locally-reproduced cause of this exact error message; see `agent_documentation/05_known_limitations.md` for how it was confirmed and what remains unproven.
 - `Library` should be saved before `Input`/`Context`/`Output` are ever exercised (step 6 above) — Chronicle assumes AI Dungeon evaluates `Library` first. If the smoke test's `Chronicle Temporal State` card never appears, this is the first thing to check.
 - Set `Chronicle Enabled: false` on the `Configure Chronicle` card any time you want Chronicle off — it pauses without losing its saved timeline.
 - Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `Chronicle Temporal State` Story Card's Notes, for players who want to inspect how the clock got there.

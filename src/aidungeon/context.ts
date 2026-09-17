@@ -10,19 +10,27 @@ declare const addStoryCard: ((keys: string, entry: string, type: string) => numb
 declare const updateStoryCard: ((index: number, keys: string, entry: string, type: string) => void) | undefined;
 declare const removeStoryCard: ((index: number) => void) | undefined;
 
+// Deliberately written with plain if/else instead of optional chaining or
+// nullish coalescing: this tab's own compiled output should be as small and
+// literal as possible, since it -- along with Input and Output -- is the
+// artifact most likely to be hand-copied from a rendered Markdown code block
+// rather than downloaded as a file (see 05_known_limitations.md).
 const modifier = (value: unknown) => {
   const safeText = typeof value === "string" ? value : "";
-  return {
-    text: isPlainObject(state)
-      ? (globalThis.ChronicleAIDungeon?.onContext(safeText, {
-          state,
-          actionCount: info?.actionCount,
-          maxChars: info?.maxChars,
-          memoryLength: info?.memoryLength,
-          storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-        }) ?? nonEmptyText(safeText))
-      : nonEmptyText(safeText)
-  };
+  if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
+  const runtime = globalThis.ChronicleAIDungeon;
+  if (runtime === undefined) return { text: nonEmptyText(safeText) };
+  const actionCount = info === undefined ? undefined : info.actionCount;
+  const maxChars = info === undefined ? undefined : info.maxChars;
+  const memoryLength = info === undefined ? undefined : info.memoryLength;
+  const result = runtime.onContext(safeText, {
+    state,
+    actionCount,
+    maxChars,
+    memoryLength,
+    storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+  });
+  return { text: result };
 };
 
 modifier(text);
