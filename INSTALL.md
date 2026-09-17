@@ -204,11 +204,41 @@ If Chronicle appears to do nothing after installation, this is the first thing t
 
 ## 3. `Configure Chronicle` — your last checkpoint before the story begins
 
-You do not create the configuration card yourself, and you don't need to pick a card **Type**,
-decide what **Keys**/**Triggers** mean, or know anything about AI Dungeon's scripting API.
-**`Configure Chronicle`** (Type `Class`) is meant to already be sitting in your Story Cards by the
-time your adventure's opening scene appears — before you've typed a single action — ready to use
-exactly as it is:
+**`Configure Chronicle`** (Type `Class`) is meant to work as a pre-flight card: something you can
+open and, if you want, switch to `Manual` with your own starting date/time, **before your first
+turn is ever processed** — because Chronicle only reads it and builds the story's timeline the first
+time a turn actually runs, never before. Getting the card to exist *before* that first turn takes one
+of two paths:
+
+### Normal flow — add it to the Scenario once (recommended)
+
+AI Dungeon copies a Scenario's own Story Cards into every Adventure created from it (the same way
+Plot Essentials and other Scenario settings carry over — see the [official Story Cards
+guide](https://help.aidungeon.com/faq/story-cards)). Adding `Configure Chronicle` here, once, when
+you set up the Scenario, means it is present in every Adventure from the very start — genuinely
+before anyone's first action, with no scripting involved:
+
+1. In your Scenario (not inside a played Adventure), open **Details -> Story Cards** and add a new
+   card.
+2. Set **Name/Title** to `Configure Chronicle`, **Type** to `Class`, and paste the Entry/Notes
+   templates below into the card's **Entry** and **Notes** fields.
+3. Save. Every new Adventure started from this Scenario now already has the card, ready to review or
+   edit before playing.
+
+This is a **one-time step per Scenario**, not something a player repeats per Adventure.
+
+### Recovery flow — Chronicle creates it if it's missing
+
+If you skip the step above, or the card is later deleted by accident, Chronicle notices the moment
+its scripts next run and creates the card itself. **This is a recovery measure, not the intended
+onboarding path** — and it comes with a specific guarantee to make up for the lost pre-flight moment:
+when Chronicle has to recovery-create the card, it deliberately does **not** initialize the timeline
+that same turn. Nothing about `state`/the timeline is touched until a *later* turn — giving you a
+real turn to open the freshly-created card and choose Manual before Chronicle ever reads it for real.
+Concretely: play a turn, see that `Configure Chronicle` now exists (Automatic, enabled), optionally
+edit it, then play your *next* turn — that is the one that actually starts the clock.
+
+Either way, once it exists, the card is ready to use exactly as it is:
 
 - `Chronicle Enabled: true` — Chronicle is already on.
 - `Initialization Mode: Automatic` — it will start the story clock from the current real-world time
@@ -216,7 +246,8 @@ exactly as it is:
 
 **If that's what you want, you can ignore this card completely and just start playing.** Open it
 only if you want a custom starting date/time: switch `Initialization Mode` to `Manual` and fill in
-the Start fields, **before playing your first turn** — see below for why that timing matters.
+the Start fields, **before playing the turn that starts your timeline** — see above for exactly when
+that is under each flow.
 
 Its **Entry** (the editable part) looks like this:
 
@@ -294,18 +325,12 @@ initialized, per the one-shot behavior above) whenever you like after this first
 **Already have an older `chronicle-configuration` card from a previous version?** Nothing to do —
 Chronicle finds it automatically (by its old `keys` identifier), renames/retypes it to the new
 `Configure Chronicle` / `Class` card, and moves any settings that were in its Notes into the new
-Entry, preserving your existing values. It does not create a second card.
+Entry, preserving your existing values. It does not create a second card, and — since the card
+already existed — this does not trigger the recovery flow's initialization delay above.
 
-**If the card is ever missing** (deleted by accident, or this is your very first turn and the
-platform hasn't run Chronicle's scripts before now — see the caveat below), Chronicle recreates it
-automatically the moment it next runs, as a recovery measure, not as the normal way this card is
-meant to appear. Recreating it never resets an already-initialized timeline.
-
-<sub>Whether AI Dungeon runs a Scenario's scripts (and so creates this card) before the player's very
-first typed action, or only once that action is submitted, is a platform behavior Chronicle cannot
-independently confirm from outside a running session — the same class of open question as the
-"Library load order" assumption below. Practically: open the Story Cards list right after creating
-your Scenario, before typing anything, to check.</sub>
+**If the card is ever recreated as recovery after your timeline already started** (e.g. it was
+deleted mid-story), that recreation never resets the already-initialized timeline; it only rebuilds
+the card itself.
 
 ## 4. Smoke test: confirm Chronicle initialized
 
@@ -313,7 +338,12 @@ This is the one check every install should run before anything else — it tells
 minute, whether Chronicle is actually active or only appears to be installed.
 
 1. Play (or Continue) one turn in your Scenario, with the Manual example from section 3 above
-   already in place.
+   already in place on `Configure Chronicle`.
+   - **If you went through the normal flow** (card added to the Scenario beforehand), this first
+     turn already initializes the timeline.
+   - **If you're relying on the recovery flow** (no card added beforehand), this first turn instead
+     creates `Configure Chronicle` — open it now, set it to Manual with the example values, then play
+     a **second** turn; that second turn is the one that initializes the timeline.
 2. Open your Story Cards and look for a card named **`Chronicle Temporal State`**.
 3. Its entry should read:
    ```
@@ -352,9 +382,13 @@ first — its message is written to explain what happened (invalid persisted sta
 Card, a configuration card that could not be created, an unsupported time range, or an unexpected
 internal error) rather than failing silently.
 
-One situation remains genuinely silent by design and is not diagnosed this way: **Library not
-evaluated first** (see step 2) — every hook passes text through unmodified, and Chronicle never gets
-a chance to run at all, including its own configuration-card creation.
+Two situations remain genuinely silent by design and are not diagnosed this way:
+
+- **Library not evaluated first** (see step 2) — every hook passes text through unmodified, and
+  Chronicle never gets a chance to run at all, including its own configuration-card creation.
+- **The recovery flow's one-turn initialization delay** (section 3) — the turn that recovery-creates
+  `Configure Chronicle` intentionally does not start the timeline or write `Chronicle Temporal
+  State` yet. This is expected, not an error; it resolves itself on your very next turn.
 
 If a hook ever runs with a missing or malformed `state`, `storyCards`, `addStoryCard`, or
 `updateStoryCard` global (an AI Dungeon runtime irregularity, not a normal condition), Chronicle

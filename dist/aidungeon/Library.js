@@ -1025,6 +1025,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     return Object.freeze({
       onInput(text, context) {
         clearChronicleNotification(context.state);
+        delete context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY];
         ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         if (!enabled(context)) return nonEmptyText(text);
@@ -1127,10 +1128,12 @@ ${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock() : with
   var DUPLICATE_CARD_ERROR = "Chronicle has duplicate temporal-state cards. Set Repair Chronicle Card: true in the configuration card to repair them explicitly.";
   var UNSUPPORTED_RANGE_ERROR = "Chronicle rejected the last beat's elapsed time because it would move the story outside the supported year range (0001-9999). Canonical time was not changed.";
   var CONFIGURATION_CARD_ERROR = 'Chronicle could not create or update its "Configure Chronicle" Story Card unexpectedly. Chronicle is paused this turn; canonical time (if any) is unaffected.';
+  var CHRONICLE_CONFIG_RECOVERY_PENDING_KEY = "chronicleConfigRecoveryPending";
   function ensureConfigurationCardForContext(context) {
     if (context.storyCards === void 0) return;
     try {
-      ensureChronicleConfigurationCard(context.storyCards);
+      const result = ensureChronicleConfigurationCard(context.storyCards);
+      if (result.status === "created") context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY] = true;
       if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === CONFIGURATION_CARD_ERROR) delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
     } catch (error) {
       context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `${CONFIGURATION_CARD_ERROR} (${error instanceof Error ? error.message : String(error)})`;
@@ -1166,6 +1169,7 @@ ${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock() : with
       return void 0;
     }
     if (context.storyCards === void 0) return void 0;
+    if (context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY] === true) return void 0;
     const configuration = readChronicleConfiguration(context.storyCards.storyCards);
     if (!configuration.enabled) return void 0;
     if (configuration.error !== void 0) {

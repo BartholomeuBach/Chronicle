@@ -265,19 +265,24 @@ Chronicle exists so the narrator stops having to guess what time it is.
    <!-- chronicle:dist-embed:Output:end -->
 
 10. Click **SAVE** again, now that all four tabs are pasted.
-11. **Open your Story Cards.** You don't need to create anything yourself — **`Configure Chronicle`**
-    (Type `Class`) is meant to already be there, ready to use as-is: enabled, `Automatic`. If you're
-    happy with that, skip straight to step 12. If you want a custom starting date/time, this is the
-    moment to switch `Initialization Mode` to `Manual` and fill in the Start fields — see the
-    [configuration card](#configuration-card) section below for why doing this *now*, before your
-    first turn, matters.
+11. **Add the `Configure Chronicle` Story Card to the Scenario itself** (recommended, one-time
+    step) — open your Scenario's **Details -> Story Cards** (not an Adventure's), add a card, set
+    **Name/Title** to `Configure Chronicle` and **Type** to `Class`, then paste in the Entry/Notes
+    templates from the [configuration card](#configuration-card) section below. AI Dungeon copies a
+    Scenario's Story Cards into every Adventure created from it, so this makes the card available
+    before anyone's first action, with no scripting involved. **Skipping this step is fine** —
+    Chronicle creates the card itself the first time it runs — but then your first turn only creates
+    the card (see [configuration card](#configuration-card) below for why), and your *second* turn is
+    the one that actually starts the timeline.
 
-    **For your very first test**, switch to `Manual` with fixed values (see below) before playing —
-    it makes what Chronicle should show you exact and predictable, with no timezone guesswork
-    involved.
-12. **Play (or Continue) one turn, then smoke test** by opening your Story Cards and confirming:
+    **For your very first test**, switch `Initialization Mode` to `Manual` with fixed values (see
+    below) on whichever turn the card is actually available to edit — it makes what Chronicle should
+    show you exact and predictable, with no timezone guesswork involved.
+12. **Play (or Continue), then smoke test** by opening your Story Cards and confirming:
     - a card named `Configure Chronicle` exists;
-    - a card named `Chronicle Temporal State` also exists;
+    - a card named `Chronicle Temporal State` also exists (only after the turn that actually
+      initializes the timeline — immediately if you added the card to the Scenario, one turn later if
+      you relied on Chronicle creating it);
     - its entry matches what you set — with the recommended Manual example, that's exactly:
       ```
       [Chronicle]
@@ -294,17 +299,25 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 Every turn played from that Scenario from now on runs through Chronicle.
 
-<sub>Chronicle is enabled by default from the moment it creates its own `Configure Chronicle` card — set `Chronicle Enabled: false` on that card any time you want to pause it.</sub>
+<sub>`Configure Chronicle` is enabled (`Chronicle Enabled: true`) by default — set it `false` any time you want to pause Chronicle.</sub>
 
 ---
 
 ### Configuration card
 
-**`Configure Chronicle`** (Type `Class`) is your last checkpoint before the story's clock starts.
-It's meant to already exist and already be ready to use, enabled and `Automatic` — Chronicle creates
-and maintains it, you never build it by hand. Its **Entry** field holds the editable settings; its
-**Notes** field is documentation/help text only and is never read for settings. Edit values directly
-in Entry:
+**`Configure Chronicle`** (Type `Class`) is your last checkpoint before the story's clock starts —
+enabled and `Automatic` out of the box. Two ways to get it in place before your first turn:
+
+- **Normal flow (recommended):** add it once to the *Scenario's* own Story Cards (see step 11 above),
+  not inside a played Adventure. AI Dungeon carries a Scenario's Story Cards into every Adventure
+  created from it, so the card is simply already there, before any action is taken.
+- **Recovery flow:** skip the step above, and Chronicle creates the card itself the first time it
+  runs — but deliberately does **not** start the timeline that same turn, so you still get a full
+  turn to open the card and choose Manual before Chronicle ever reads it for real. Your next turn
+  after that is what actually starts the clock.
+
+Its **Entry** field holds the editable settings; its **Notes** field is documentation/help text only
+and is never read for settings. Edit values directly in Entry:
 
 ```
 Chronicle Enabled: true
@@ -358,9 +371,8 @@ from before, Chronicle finds it automatically, renames/retypes it to `Configure 
 and moves any settings that were in its Notes into the new Entry field — your existing values are
 preserved, and no second card is created.
 
-**If this card is ever missing** (deleted by accident, or the platform simply hasn't run Chronicle's
-scripts yet for your adventure), Chronicle recreates it the next time it runs — this is a recovery
-measure, not the normal way you're expected to encounter this card, and it never resets an
+**If this card is ever missing after your timeline already started** (e.g. deleted mid-story),
+Chronicle recreates it the next time it runs — this only rebuilds the card and never resets an
 already-initialized timeline.
 
 This gives you an exact, predictable expected value for the smoke test above — `2026/09/16 18:00:00`

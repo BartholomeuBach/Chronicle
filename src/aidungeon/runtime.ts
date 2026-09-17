@@ -47,6 +47,14 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
   return Object.freeze({
     onInput(text: string, context: AIDungeonHookContext) {
       clearChronicleNotification(context.state);
+      // Input marks the start of a new turn (the one point in the hook cycle
+      // this codebase already treats that way -- see pendingPlayerAction
+      // below). Clearing here, before this turn's own ensureConfigurationCardForContext
+      // call runs, means: if THIS call is what recovery-creates the card, the
+      // flag it sets survives for the rest of this turn; if the card was
+      // instead recovery-created on a *prior* turn, this clears that stale
+      // flag so ensureInitialized is unblocked starting now (D-032).
+      delete context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY];
       ensureConfigurationCardForContext(context);
       // Runs even when Chronicle is disabled this turn, so a previously
       // injected instruction is torn down promptly instead of lingering.
@@ -201,22 +209,32 @@ function setChronicleNotification(state: Record<string, unknown>, notification: 
 const DUPLICATE_CARD_ERROR = "Chronicle has duplicate temporal-state cards. Set Repair Chronicle Card: true in the configuration card to repair them explicitly.";
 const UNSUPPORTED_RANGE_ERROR = "Chronicle rejected the last beat's elapsed time because it would move the story outside the supported year range (0001-9999). Canonical time was not changed.";
 const CONFIGURATION_CARD_ERROR = "Chronicle could not create or update its \"Configure Chronicle\" Story Card unexpectedly. Chronicle is paused this turn; canonical time (if any) is unaffected.";
+const CHRONICLE_CONFIG_RECOVERY_PENDING_KEY = "chronicleConfigRecoveryPending";
 
 /**
  * Ensures the canonical "Configure Chronicle" card exists and is in canonical shape.
- * The intended product flow (D-031) is that this card is already present -- Automatic,
- * enabled -- as the last configuration checkpoint before the story's timeline starts,
- * so this call's create/migrate branches exist as *recovery* for the card being
- * unexpectedly missing or still legacy-shaped, not as the normal onboarding path.
- * It still runs on every hook, before the enabled check, so that recovery (and a
- * freshly recovered card's default `Chronicle Enabled: true`) takes effect the same
- * turn it's needed. A failure here must never crash the turn: it is reported through
+ *
+ * NORMAL FLOW (D-032): this card is meant to already exist -- added once, directly in
+ * the Scenario's own Story Cards editor (not via scripting), so AI Dungeon's documented
+ * Scenario-to-Adventure copy behavior carries it into every new Adventure before any
+ * script ever runs. In that flow this call always finds an existing card and simply
+ * normalizes it if needed (D-030).
+ *
+ * RECOVERY FLOW: if the card is unexpectedly missing (deleted, or the Scenario creator
+ * skipped the one-time setup step), this call creates it from scratch. Recovery
+ * creation deliberately does NOT also initialize the timeline in the same turn --
+ * see the `CHRONICLE_CONFIG_RECOVERY_PENDING_KEY` guard in `ensureInitialized` below --
+ * so a creator who only discovers the card this way still gets a full turn to open it,
+ * choose Automatic/Manual, and edit the Start fields before `state.chronicleRuntime` is
+ * ever created. Runs on every hook, before the enabled check, so recovery happens as
+ * early as possible. A failure here must never crash the turn: it is reported through
  * the same runtime-error channel as every other Chronicle diagnostic.
  */
 function ensureConfigurationCardForContext(context: AIDungeonHookContext): void {
   if (context.storyCards === undefined) return;
   try {
-    ensureChronicleConfigurationCard(context.storyCards);
+    const result = ensureChronicleConfigurationCard(context.storyCards);
+    if (result.status === "created") context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY] = true;
     if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === CONFIGURATION_CARD_ERROR) delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
   } catch (error) {
     context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `${CONFIGURATION_CARD_ERROR} (${error instanceof Error ? error.message : String(error)})`;
@@ -253,6 +271,11 @@ function ensureInitialized(context: AIDungeonHookContext): ChroniclePersistentRu
     return undefined;
   }
   if (context.storyCards === undefined) return undefined;
+  // The configuration card was just recovery-created this turn (D-032): defer
+  // initialization to a later turn instead of consuming Automatic/Manual and the
+  // Start fields the same moment the card first appears, so a creator who only
+  // discovers Chronicle through recovery still gets a real chance to edit it first.
+  if (context.state[CHRONICLE_CONFIG_RECOVERY_PENDING_KEY] === true) return undefined;
   const configuration = readChronicleConfiguration(context.storyCards.storyCards);
   if (!configuration.enabled) return undefined;
   if (configuration.error !== undefined) {

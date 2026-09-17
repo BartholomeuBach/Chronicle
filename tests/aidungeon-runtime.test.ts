@@ -293,7 +293,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toBeUndefined();
   });
 
-  it("auto-creates the canonical configuration card on first use, and Chronicle activates the same turn (D0 corrective pass)", () => {
+  it("auto-creates the canonical configuration card as recovery on first use, without initializing the timeline that same turn (D-032)", () => {
     const state: Record<string, unknown> = {};
     const cards: AiDungeonStoryCard[] = [];
     const storyCards: StoryCardRuntime = {
@@ -301,12 +301,43 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
       addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
       updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
     };
+    const runtime = createChronicleRuntime();
 
-    expect(createChronicleRuntime().onInput("I wake up.", { state, actionCount: 1, storyCards })).toBe("I wake up.");
-
+    // Turn 1: the card did not exist, so it is recovery-created here -- but the
+    // creator has not had any chance to open/edit it yet, so the timeline must
+    // NOT be born this same turn.
+    expect(runtime.onInput("I wake up.", { state, actionCount: 1, storyCards })).toBe("I wake up.");
     expect(cards).toHaveLength(1);
     expect(cards[0].title).toBe("Configure Chronicle");
-    expect(state.chronicleRuntime).toBeDefined(); // Chronicle Enabled defaults to true, so it initializes immediately
+    expect(state.chronicleRuntime).toBeUndefined(); // deferred -- recovery just happened, not a real editing window yet
+    expect(runtime.onContext("Base context.", { state, storyCards })).toBe("Base context."); // no [Chronicle] projection yet either
+    expect(runtime.onOutput("Some narration.", { state, actionCount: 1, storyCards })).toBe("Some narration."); // no ledger record
+
+    // Turn 2: a full turn has passed since recovery, so initialization proceeds normally,
+    // reading whatever the creator left on the card (untouched defaults, in this case).
+    expect(runtime.onInput("I look around.", { state, actionCount: 2, storyCards })).toBe("I look around.");
+    expect(state.chronicleRuntime).toBeDefined();
+  });
+
+  it("lets a creator who edits the recovery-created card mid-turn still get their Manual choice honored, once initialization actually runs (D-032)", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+    const runtime = createChronicleRuntime();
+
+    runtime.onInput("I wake up.", { state, actionCount: 1, storyCards }); // recovery-creates the card, defers init
+    expect(state.chronicleRuntime).toBeUndefined();
+
+    // The creator opens the just-created card and switches to Manual before their next turn.
+    cards[0].entry = "Chronicle Enabled: true\nInitialization Mode: Manual\nStart Year: 1342\nStart Month: 9\nStart Day: 17\nStart Hour: 8\nStart Minute: 0\nStart Second: 0\nAI Temporal Signal: true\nRepair Chronicle Card: false";
+
+    runtime.onInput("I check my surroundings.", { state, actionCount: 2, storyCards });
+    const runtimeState = (state.chronicleRuntime as { chronicleState: { currentDateTime: { year: number; month: number; day: number; hour: number } } }).chronicleState;
+    expect(runtimeState.currentDateTime).toMatchObject({ year: 1342, month: 9, day: 17, hour: 8 });
   });
 
   it("migrates a legacy chronicle-configuration card found only by keys, preserving its settings", () => {
@@ -324,6 +355,27 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(cards[0].title).toBe("Configure Chronicle");
     expect(cards[0].entry).toContain("Chronicle Enabled: false");
     expect(state.chronicleRuntime).toBeUndefined(); // still disabled, exactly as the migrated setting says
+  });
+
+  it("initializes on the very first turn when the configuration card already existed beforehand -- the normal flow (D-032)", () => {
+    const state: Record<string, unknown> = {};
+    // Simulates a card pre-seeded on the Scenario itself (e.g. via the Scenario's own
+    // Story Cards editor, copied into every new Adventure) -- not recovery-created here.
+    const cards: AiDungeonStoryCard[] = [{
+      keys: "chronicle-configuration", title: "Configure Chronicle", type: "class",
+      entry: "Chronicle Enabled: true\nInitialization Mode: Manual\nStart Year: 1342\nStart Month: 9\nStart Day: 17\nStart Hour: 8\nStart Minute: 0\nStart Second: 0\nAI Temporal Signal: true\nRepair Chronicle Card: false"
+    }];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+
+    createChronicleRuntime().onInput("I wake up.", { state, actionCount: 1, storyCards });
+
+    expect(cards).toHaveLength(1); // no second card created
+    const runtimeState = (state.chronicleRuntime as { chronicleState: { currentDateTime: { year: number; month: number; day: number; hour: number } } } | undefined)?.chronicleState;
+    expect(runtimeState?.currentDateTime).toMatchObject({ year: 1342, month: 9, day: 17, hour: 8 });
   });
 
   it("does not crash the turn when the configuration card cannot be created or recovered", () => {
