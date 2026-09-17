@@ -1,4 +1,4 @@
-import { nonEmptyText } from "./runtime.js";
+import { nonEmptyText } from "./non-empty-text.js";
 import type { AiDungeonStoryCard } from "./story-cards/chronicle-story-card.js";
 
 declare const text: string;

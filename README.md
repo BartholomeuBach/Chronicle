@@ -123,12 +123,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 > **Ready-to-install** means the four files below compile, pass Chronicle's full local test suite, and paste cleanly into AI Dungeon's script tabs — and CI re-checks on every change that they are exactly what building the current source produces, so they never silently go stale. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below (the fuller evidence breakdown lives in this project's internal `agent_documentation/`, which isn't part of the public repo).
 
-**No cloning, no Node, no build step required.** The four files you need already live in this repository, ready to copy straight from GitHub:
-
-- [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js)
-- [`Input.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js)
-- [`Context.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js)
-- [`Output.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js)
+**No cloning, no Node, no build step required.** `Input`, `Context`, and `Output` are small enough to copy directly from this page. Only `Library` — Chronicle's actual engine — is big enough to need its own file, linked below.
 
 ### Scenario Script Install Guide
 
@@ -137,13 +132,86 @@ Chronicle exists so the narrator stops having to guess what time it is.
 3. Open the `DETAILS` tab, scroll down to `Scripting`, and toggle on **Scripts Enabled**.
 4. Select `EDIT SCRIPTS`.
 5. Open [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js) on GitHub, click the **copy** icon in the top-right corner of the file (or select all and copy), then select the `Library` tab on the left, delete everything in it, and paste.
-6. Repeat step 5 for [`Input.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js) → the `Input` tab.
-7. Repeat step 5 for [`Context.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js) → the `Context` tab.
-8. Repeat step 5 for [`Output.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js) → the `Output` tab.
+6. Select the `Input` tab, delete everything in it, and paste the code below:
+
+   <!-- chronicle:dist-embed:Input:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Input script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/input.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(value, { state, actionCount: info.actionCount, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Input:end -->
+
+7. Select the `Context` tab, delete everything in it, and paste the code below:
+
+   <!-- chronicle:dist-embed:Context:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Context script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/context.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(value, { state, actionCount: info.actionCount, maxChars: info.maxChars, memoryLength: info.memoryLength, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Context:end -->
+
+8. Select the `Output` tab, delete everything in it, and paste the code below:
+
+   <!-- chronicle:dist-embed:Output:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Output script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/output.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(value, {
+           state,
+           actionCount: info.actionCount,
+           storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 }
+         })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Output:end -->
+
 9. Click the **SAVE** button.
 10. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**.
 
-<sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle.</sub>
+<sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle. These three snippets and `Library.js` are kept in sync with the current source automatically: CI fails the build if any of them ever stops matching a fresh build.</sub>
 
 ### *And that's it — Chronicle is live.*
 

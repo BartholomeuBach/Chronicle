@@ -122,6 +122,11 @@
     return activityPriors.some((prior) => matchesActivity(action, prior.activity) && matchesActivity(narrative, prior.activity));
   }
 
+  // src/aidungeon/non-empty-text.ts
+  function nonEmptyText(text) {
+    return text === "" ? "\u200B" : text;
+  }
+
   // src/chronicle/calendar/normalize-gregorian-date-time.ts
   var SECONDS_PER_DAY2 = 86400;
   var MIN_YEAR = 1;
@@ -829,9 +834,6 @@ Story time: ${formatChronicleDateTime(next)}.`;
   var CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
   var CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
   var CHRONICLE_RUNTIME_SCHEMA_VERSION = 1;
-  function nonEmptyText(text) {
-    return text === "" ? "\u200B" : text;
-  }
   function initializeChronicleRuntime(state, chronicleState) {
     state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState, ledger: createTemporalLedger(), pendingPlayerAction: void 0 });
     delete state[CHRONICLE_RUNTIME_ERROR_KEY];
@@ -951,7 +953,6 @@ ${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock() : with
       delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
     }
   }
-  var passthroughRuntime = createChronicleRuntime();
   function read(state) {
     const value = state[CHRONICLE_RUNTIME_STATE_KEY];
     if (value === void 0) return void 0;

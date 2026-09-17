@@ -22,42 +22,118 @@ runtime behaves, not yet observed). Where that distinction matters, it is called
 
 ## 1. Get the four script files — no clone, no Node, no build
 
-The four files this package needs are already committed to this repository, ready to copy
-straight from GitHub. **You do not need to clone this repository, install Node/npm, or run any
-build command to install Chronicle.**
+**You do not need to clone this repository, install Node/npm, or run any build command to install
+Chronicle.** `Library.js` is Chronicle's actual engine, big enough to need its own file (linked
+below); `Input.js`, `Context.js`, and `Output.js` are each ~20 lines and pasted directly below,
+same as `Library.js`'s content would be if it weren't too long for this to stay readable.
 
-| File | AI Dungeon tab | GitHub link |
+| File | AI Dungeon tab | How to get it |
 |---|---|---|
-| `Library.js` | **Library** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js> |
-| `Input.js` | **Input** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js> |
-| `Context.js` | **Context** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js> |
-| `Output.js` | **Output** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js> |
-
-For each one: open the link, click the **copy** icon in the file view's top-right corner (or
-select all and copy), then paste the full contents into the matching AI Dungeon tab.
+| `Library.js` | **Library** | Open <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js>, click the **copy** icon in the top-right corner (or select all and copy). |
+| `Input.js` | **Input** | Copy the block in step 2 of section 2, below. |
+| `Context.js` | **Context** | Copy the block in step 3 of section 2, below. |
+| `Output.js` | **Output** | Copy the block in step 4 of section 2, below. |
 
 Each file is self-contained (no `import`/`require`, verified by `npm run verify:dist`) and is
 meant to be pasted whole into its matching tab, replacing that tab's contents.
 
-**Locally validated, not a claim about GitHub:** a CI check (`npm run verify:dist:fresh`, part of
-`npm run check`, wired into `.github/workflows/check.yml`) fails the build whenever these four
-files stop matching a fresh build of the current TypeScript source. That means whatever is at the
-links above, on the `main` branch, is guaranteed in sync with this repository's own source — it
-does not mean GitHub itself is guaranteed available or unaltered; that trust is the same as for any
-GitHub-hosted file.
+**Locally validated, not a claim about GitHub:** two CI checks, both part of `npm run check`
+(wired into `.github/workflows/check.yml`), keep all four in sync with source automatically —
+`verify:dist:fresh` for the `dist/aidungeon/*.js` files themselves, `verify:embedded-snippets` for
+the three copies pasted into this document and `README.md` below. Either fails the build the moment
+source and an installable copy — file or pasted snippet — disagree. That guarantees `main`'s
+content is internally consistent; it does not mean GitHub itself is guaranteed available or
+unaltered, which is the same trust boundary as for any GitHub-hosted file or page.
 
 <sub>Building from source (`npm install && npm run build`) exists only for developers modifying
 Chronicle's TypeScript. It regenerates these same four files in place; it has never been required
 to install Chronicle. `npm run verify:dist` checks the build's structural validity (self-contained,
-`modifier(text)` present); `npm run verify:dist:fresh` separately checks the build matches what's
-committed — see `06_testing_strategy.md` in this project's internal `agent_documentation/` (not
-part of the public repo) for how these compose into `npm run check`.</sub>
+`modifier(text)` present); `npm run verify:dist:fresh` and `npm run verify:embedded-snippets`
+separately check that the build and this document's pasted copies match what's committed — see
+`06_testing_strategy.md` in this project's internal `agent_documentation/` (not part of the public
+repo) for how these compose into `npm run check`.</sub>
 
 ## 2. Paste the scripts, Library first
 
-1. Open your Scenario's **Details -> Scripting**.
-2. Paste `Library.js` into the **Library** tab and save.
-3. Paste `Input.js`, `Context.js`, and `Output.js` into their matching tabs and save.
+1. Open your Scenario's **Details -> Scripting**. Paste `Library.js` (from section 1 above) into
+   the **Library** tab and save.
+2. Select the `Input` tab, delete everything in it, and paste this:
+
+   <!-- chronicle:dist-embed:Input:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Input script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/input.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(value, { state, actionCount: info.actionCount, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Input:end -->
+
+3. Select the `Context` tab, delete everything in it, and paste this:
+
+   <!-- chronicle:dist-embed:Context:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Context script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/context.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(value, { state, actionCount: info.actionCount, maxChars: info.maxChars, memoryLength: info.memoryLength, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Context:end -->
+
+4. Select the `Output` tab, delete everything in it, and paste this:
+
+   <!-- chronicle:dist-embed:Output:start -->
+   ```js
+   // Chronicle — paste this file into the AI Dungeon Output script tab.
+   "use strict";
+   (() => {
+     // src/aidungeon/non-empty-text.ts
+     function nonEmptyText(text2) {
+       return text2 === "" ? "\u200B" : text2;
+     }
+
+     // src/aidungeon/output.ts
+     var modifier = (value) => {
+       var _a, _b;
+       return {
+         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(value, {
+           state,
+           actionCount: info.actionCount,
+           storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 }
+         })) != null ? _b : nonEmptyText(value)
+       };
+     };
+     modifier(text);
+   })();
+   ```
+   <!-- chronicle:dist-embed:Output:end -->
+
+5. Save.
 
 **Library must be saved before the other three are exercised.** Chronicle's Input/Context/Output
 scripts call a single shared function that Library sets up when it runs; the assumption is that AI

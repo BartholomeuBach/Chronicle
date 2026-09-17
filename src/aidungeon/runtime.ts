@@ -1,3 +1,4 @@
+import { nonEmptyText } from "./non-empty-text.js";
 import { createTemporalLedger, isTemporalLedger, type TemporalLedger } from "../chronicle/ledger/temporal-ledger.js";
 import { recordTemporalDecision } from "../chronicle/ledger/record-temporal-decision.js";
 import type { TemporalReasoner } from "../chronicle/reasoning/temporal-reasoner.js";
@@ -25,13 +26,16 @@ export interface ChronicleRuntime {
   onOutput(text: string, context: AIDungeonHookContext): string;
 }
 
-/**
- * AI Dungeon treats empty Input and Output text as a script error. A zero-width
- * placeholder keeps the Phase 0 adapter safe without altering non-empty prose.
- */
-export function nonEmptyText(text: string): string {
-  return text === "" ? "\u200B" : text;
-}
+// nonEmptyText now lives in its own module (non-empty-text.ts), re-exported
+// here for existing callers (e.g. tests) that import it from "./runtime.js".
+// Kept in its own file specifically so Input/Context/Output -- which need
+// only this one helper, never the rest of this module's domain-wiring
+// exports -- don't drag Chronicle's whole reasoning/ledger/state dependency
+// graph into their bundles the way importing it from here would (confirmed
+// by direct measurement, 2026-09-16: ~200 unnecessary lines per file
+// otherwise, from `rule-based-temporal-reasoner.ts` and the 198-entry
+// activity-prior catalog alone, neither of which nonEmptyText needs).
+export { nonEmptyText };
 
 export function initializeChronicleRuntime(state: Record<string, unknown>, chronicleState: ChronicleState): void {
   state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState, ledger: createTemporalLedger(), pendingPlayerAction: undefined });
@@ -208,8 +212,6 @@ function syncProjection(context: AIDungeonHookContext, current: ChroniclePersist
     delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
   }
 }
-
-export const passthroughRuntime: ChronicleRuntime = createChronicleRuntime();
 
 function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {
   const value = state[CHRONICLE_RUNTIME_STATE_KEY];
