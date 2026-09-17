@@ -203,6 +203,55 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect((state.chronicleRuntime as { chronicleState: { currentDateTime: { year: number } } }).chronicleState.currentDateTime.year).toBe(2026);
   });
 
+  it("does not rebuild the clock when Initialization Mode itself changes after the timeline has started (D-031)", () => {
+    const state: Record<string, unknown> = {};
+    initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
+    // The card now says Automatic, having been Manual (or vice versa) at the moment of first init -- switching modes afterward must be a no-op.
+    const cards = [configurationCard("Chronicle Enabled: true\nInitialization Mode: Automatic")];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+
+    createChronicleRuntime().onContext("Base context.", { state, storyCards });
+    const runtimeState = (state.chronicleRuntime as { chronicleState: { currentDateTime: { year: number; hour: number } } }).chronicleState;
+    expect(runtimeState.currentDateTime).toMatchObject({ year: 2026, hour: 19 }); // unchanged, not reseeded from "now"
+  });
+
+  it("recreates a missing configuration card as recovery, without resetting an already-initialized timeline (D-031)", () => {
+    const state: Record<string, unknown> = {};
+    initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
+    // The configuration card vanished (e.g. accidentally deleted); auto-create is recovery-only here, not the normal onboarding path.
+    const cards: AiDungeonStoryCard[] = [];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+
+    createChronicleRuntime().onContext("Base context.", { state, storyCards });
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].title).toBe("Configure Chronicle"); // recovered, not skipped
+    const runtimeState = (state.chronicleRuntime as { chronicleState: { currentDateTime: { year: number; hour: number } } }).chronicleState;
+    expect(runtimeState.currentDateTime).toMatchObject({ year: 2026, hour: 19 }); // the existing timeline survives the recreated card untouched
+  });
+
+  it("keeps runtime settings (Enabled, AI Temporal Signal, Repair) effective after the timeline has initialized (D-031)", () => {
+    const state: Record<string, unknown> = {};
+    initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
+    const cards = [configurationCard("Chronicle Enabled: true\nAI Temporal Signal: false")];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+    const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
+
+    // AI Temporal Signal: false, post-init, still suppresses the injected instruction.
+    runtime.onContext("Base context.", { state, storyCards });
+    expect((state.memory as { authorsNote?: string } | undefined)?.authorsNote ?? "").not.toContain("<<chronicle:");
+
+    // Chronicle Enabled: false, post-init, still pauses processing without deleting runtime state.
+    cards[0] = configurationCard("Chronicle Enabled: false");
+    runtime.onOutput("Hours pass.", { state, actionCount: 1, storyCards });
+    const runtimeState = (state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number } } }).chronicleState;
+    expect(runtimeState.currentDateTime.hour).toBe(19); // unchanged: the disabled beat never applied
+  });
+
   it("repairs duplicate canonical cards in Context only after the explicit configuration request", () => {
     const state: Record<string, unknown> = {};
     const cards: AiDungeonStoryCard[] = [

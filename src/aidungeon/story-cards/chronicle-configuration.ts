@@ -35,13 +35,45 @@ const DEFAULT_SETTINGS: Readonly<Record<string, string>> = Object.freeze({
   "start second": ""
 });
 
-/** Editable settings, in the canonical Entry format. Notes/description carries help text only. */
+/**
+ * Editable settings, in the canonical Entry format. Notes/description carries help
+ * text only. Field order and the two inline comments intentionally mirror the
+ * "last pit-stop before the timeline starts" product framing (D-031): Chronicle
+ * Enabled first, then the initialization choice (with its own "before the first
+ * turn" reminder), then the Manual-only Start fields grouped together, then the
+ * two ordinary runtime settings that stay live after initialization.
+ */
 export function renderConfigurationEntry(values: Readonly<Record<string, string>> = DEFAULT_SETTINGS): string {
-  return FIELD_LABELS.map(([key, label]) => `${label}: ${values[key] ?? DEFAULT_SETTINGS[key]}`).join("\n");
+  const value = (key: string) => values[key] ?? DEFAULT_SETTINGS[key];
+  return [
+    `Chronicle Enabled: ${value("chronicle enabled")}`,
+    "",
+    "# Choose your starting mode before playing the first turn:",
+    `Initialization Mode: ${value("initialization mode")}`,
+    "",
+    "# Used only when Initialization Mode is Manual:",
+    `Start Year: ${value("start year")}`,
+    `Start Month: ${value("start month")}`,
+    `Start Day: ${value("start day")}`,
+    `Start Hour: ${value("start hour")}`,
+    `Start Minute: ${value("start minute")}`,
+    `Start Second: ${value("start second")}`,
+    "",
+    `AI Temporal Signal: ${value("ai temporal signal")}`,
+    `Repair Chronicle Card: ${value("repair chronicle card")}`
+  ].join("\n");
 }
 export const CHRONICLE_CONFIGURATION_DEFAULT_ENTRY = renderConfigurationEntry();
 
-export const CHRONICLE_CONFIGURATION_NOTES = `# Chronicle keeps a private in-story calendar and estimates how much time
+export const CHRONICLE_CONFIGURATION_NOTES = `Chronicle is ready to start. Automatic initialization is already configured --
+you can ignore this card entirely and just play.
+If you want a custom starting date/time instead, switch Initialization Mode to
+Manual and fill in the Start fields below, before playing the first turn.
+Once the story's timeline has initialized, changing Initialization Mode or the
+Start fields again will not reset the active story clock -- they are only
+read once, the very first time, and are ignored after that by design.
+#
+# Chronicle keeps a private in-story calendar and estimates how much time
 # passes during each turn. This card lets you configure it; you don't need to
 # know anything about AI Dungeon's scripting API to use it.
 #
@@ -49,26 +81,24 @@ export const CHRONICLE_CONFIGURATION_NOTES = `# Chronicle keeps a private in-sto
 # settings:
 #
 # - Chronicle Enabled: set to false to pause Chronicle without losing its
-#   saved timeline.
+#   saved timeline. Stays effective any time you change it, before or after
+#   the timeline has started.
 # - Initialization Mode: "Automatic" starts the story clock from the
 #   current real-world New York date/time as a convenience seed (the
 #   in-story time itself stays fictional and timezone-free afterward).
 #   Set to "Manual" to instead choose your own starting date/time below.
+#   Only read once, the first time the timeline initializes.
 # - Start Year / Month / Day / Hour / Minute / Second: only used when
-#   Initialization Mode is "Manual". Leave any of them blank to fall back
-#   to the current New York value for that field.
-# - Repair Chronicle Card: set to true only if Chronicle reports duplicate
-#   "Chronicle Temporal State" cards, to remove the extras. Set it back to
-#   false afterward; it is a one-time action, not a persistent mode.
+#   Initialization Mode is "Manual", and only the first time the timeline
+#   initializes. Leave any of them blank to fall back to the current New
+#   York value for that field.
 # - AI Temporal Signal: when true (recommended), the AI Dungeon narrator
 #   itself reports how much time each reply covers, and Chronicle
 #   cross-checks that against its own rules. Set to false to use only
-#   Chronicle's built-in rules.
-#
-# IMPORTANT: do not change the Start Year/Month/Day/Hour/Minute/Second
-# fields once your story has an active timeline. They are only read the
-# very first time Chronicle initializes. Start a new adventure (or a
-# future explicit reset workflow) if you want a different starting time.
+#   Chronicle's built-in rules. Stays effective any time you change it.
+# - Repair Chronicle Card: set to true only if Chronicle reports duplicate
+#   "Chronicle Temporal State" cards, to remove the extras. Set it back to
+#   false afterward; it is a one-time action, not a persistent mode.
 #
 # Troubleshooting: if Chronicle stops updating time, check that
 # "Chronicle Enabled" is true above and that no other card also uses the
@@ -117,6 +147,15 @@ export function readChronicleConfiguration(cards: readonly AiDungeonStoryCard[],
  * overwrites Notes text unless it is empty, a known Chronicle-authored template, or
  * holds legacy settings being migrated out -- so a creator's own unrelated Notes text
  * is left untouched.
+ *
+ * Product framing (D-031): "Configure Chronicle" is meant to already exist as the last
+ * configuration checkpoint before the story's timeline starts -- Automatic/enabled out
+ * of the box, so a creator can simply ignore it and play, or open it once to switch to
+ * Manual before their first turn. This function's create/migrate path is the *recovery*
+ * mechanism for when the card is unexpectedly missing or still in a legacy shape, not
+ * the normal onboarding step; it is called on every hook (before the enabled check)
+ * specifically so recovery happens as early as possible, not because creating the card
+ * late is the intended flow.
  */
 export function ensureChronicleConfigurationCard(runtime: StoryCardRuntime): { readonly cardIndex: number; readonly status: "existing" | "migrated" | "created" } {
   const index = findChronicleConfigurationCardIndex(runtime.storyCards);
@@ -175,10 +214,10 @@ function normalizeConfigurationCard(card: AiDungeonStoryCard): boolean {
   return changed;
 }
 
-/** Chronicle-authored Notes text (old or new template) is always safe to refresh; a creator's own custom text is not. */
+/** Chronicle-authored Notes text (any past or current template revision) is always safe to refresh; a creator's own custom text is not. */
 function isKnownNotesTemplate(description: string | undefined): boolean {
   const trimmed = (description ?? "").trim();
-  return trimmed === "" || trimmed.startsWith("# Chronicle");
+  return trimmed === "" || trimmed.startsWith("# Chronicle") || trimmed.startsWith("Chronicle is ready to start");
 }
 
 function buildConfiguration(values: Record<string, string>, currentDateTime: ChronicleDateTimeInput): ChronicleConfiguration {

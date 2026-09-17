@@ -8,6 +8,7 @@ import {
   ensureChronicleConfigurationCard,
   findChronicleConfigurationCardIndex,
   readChronicleConfiguration,
+  renderConfigurationEntry,
   runtimeDateTime
 } from "../../../src/aidungeon/story-cards/index.js";
 import type { AiDungeonStoryCard, StoryCardRuntime } from "../../../src/aidungeon/story-cards/index.js";
@@ -68,8 +69,16 @@ describe("Chronicle Configuration Story Card: reading settings", () => {
   });
   it("reads an explicit duplicate-card repair request, and the Notes stay documentation-only", () => {
     expect(readChronicleConfiguration([canonicalCard("Repair Chronicle Card: true")])).toMatchObject({ repairChronicleCard: true });
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("do not change");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("will not reset the active story clock");
     expect(CHRONICLE_CONFIGURATION_NOTES).not.toContain("Chronicle Enabled: false"); // no settings values leak into Notes
+  });
+  it("communicates the ready-to-start, edit-before-the-first-turn framing in Notes and Entry", () => {
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Chronicle is ready to start");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Automatic initialization is already configured");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("before playing the first turn");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("will not reset the active story clock");
+    expect(CHRONICLE_CONFIGURATION_DEFAULT_ENTRY).toContain("Choose your starting mode before playing the first turn");
+    expect(CHRONICLE_CONFIGURATION_DEFAULT_ENTRY).toContain("Used only when Initialization Mode is Manual");
   });
   it("uses New York civil time for automatic and blank Manual components", () => {
     expect(runtimeDateTime(new Date("2026-03-08T06:59:00Z"))).toEqual({ year: 2026, month: 3, day: 8, hour: 1, minute: 59, second: 0 });
@@ -169,5 +178,41 @@ describe("ensureChronicleConfigurationCard: auto-creation and migration", () => 
     ];
     expect(findChronicleConfigurationCardIndex(cards)).toBe(1);
     expect(readChronicleConfiguration(cards)).toMatchObject({ enabled: true });
+  });
+
+  it("only ever touches Story Cards, never `state` -- provisioning the card is independent of timeline initialization", () => {
+    const cards: AiDungeonStoryCard[] = [];
+    ensureChronicleConfigurationCard(fakeRuntime(cards));
+    // A fresh card is Automatic-enabled by default -- reading it back gives the settings
+    // an editor would see immediately, with nothing about a "timeline" or `state` involved yet.
+    expect(readChronicleConfiguration(cards)).toMatchObject({ enabled: true, mode: "automatic" });
+  });
+
+  it("lets Manual mode, chosen before any turn is played, be read correctly the first time it matters", () => {
+    // Simulates the creator editing the freshly-created card's Entry before their first real turn.
+    const cards: AiDungeonStoryCard[] = [];
+    ensureChronicleConfigurationCard(fakeRuntime(cards));
+    cards[0].entry = renderConfigurationEntry({
+      "chronicle enabled": "true",
+      "initialization mode": "Manual",
+      "start year": "1342", "start month": "9", "start day": "17", "start hour": "8", "start minute": "0", "start second": "0",
+      "ai temporal signal": "true", "repair chronicle card": "false"
+    });
+    expect(readChronicleConfiguration(cards)).toMatchObject({
+      enabled: true, mode: "manual", initialDateTime: { year: 1342, month: 9, day: 17, hour: 8, minute: 0, second: 0 }
+    });
+  });
+});
+
+describe("Initialization fields are one-shot (D-031)", () => {
+  it("ensureChronicleConfigurationCard never resets Start fields or Initialization Mode on an already-canonical card", () => {
+    const cards: AiDungeonStoryCard[] = [canonicalCard(renderConfigurationEntry({
+      "chronicle enabled": "true", "initialization mode": "Manual",
+      "start year": "1500", "start month": "1", "start day": "1", "start hour": "0", "start minute": "0", "start second": "0",
+      "ai temporal signal": "true", "repair chronicle card": "false"
+    }))];
+    const before = cards[0].entry;
+    ensureChronicleConfigurationCard(fakeRuntime(cards));
+    expect(cards[0].entry).toBe(before); // untouched -- normalization never rewrites an Entry that already has recognized settings
   });
 });

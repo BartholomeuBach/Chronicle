@@ -265,16 +265,17 @@ Chronicle exists so the narrator stops having to guess what time it is.
    <!-- chronicle:dist-embed:Output:end -->
 
 10. Click **SAVE** again, now that all four tabs are pasted.
-11. **Play (or Continue) one turn.** You don't need to create anything yourself — on this turn,
-    Chronicle automatically creates a Story Card named **`Configure Chronicle`** (Type `Class`),
-    already enabled and running on the real current time. You only open it if you want to change a
-    setting; see the [configuration card](#configuration-card) section below.
+11. **Open your Story Cards.** You don't need to create anything yourself — **`Configure Chronicle`**
+    (Type `Class`) is meant to already be there, ready to use as-is: enabled, `Automatic`. If you're
+    happy with that, skip straight to step 12. If you want a custom starting date/time, this is the
+    moment to switch `Initialization Mode` to `Manual` and fill in the Start fields — see the
+    [configuration card](#configuration-card) section below for why doing this *now*, before your
+    first turn, matters.
 
-    **For your very first test**, before playing that turn, it's easier to open the card *after* it's
-    created and switch `Initialization Mode` to `Manual` with fixed values (see below), then play
-    again — it makes what Chronicle should show you exact and predictable, with no timezone
-    guesswork involved.
-12. **Smoke test**, then open your Story Cards and confirm:
+    **For your very first test**, switch to `Manual` with fixed values (see below) before playing —
+    it makes what Chronicle should show you exact and predictable, with no timezone guesswork
+    involved.
+12. **Play (or Continue) one turn, then smoke test** by opening your Story Cards and confirming:
     - a card named `Configure Chronicle` exists;
     - a card named `Chronicle Temporal State` also exists;
     - its entry matches what you set — with the recommended Manual example, that's exactly:
@@ -299,52 +300,68 @@ Every turn played from that Scenario from now on runs through Chronicle.
 
 ### Configuration card
 
-Chronicle creates and maintains a Story Card named **`Configure Chronicle`** (Type `Class`)
-automatically — you never build this card by hand. Its **Entry** field holds the editable settings;
-its **Notes** field is documentation/help text only and is never read for settings. Edit values
-directly in Entry:
+**`Configure Chronicle`** (Type `Class`) is your last checkpoint before the story's clock starts.
+It's meant to already exist and already be ready to use, enabled and `Automatic` — Chronicle creates
+and maintains it, you never build it by hand. Its **Entry** field holds the editable settings; its
+**Notes** field is documentation/help text only and is never read for settings. Edit values directly
+in Entry:
 
 ```
 Chronicle Enabled: true
+
+# Choose your starting mode before playing the first turn:
 Initialization Mode: Automatic
-Repair Chronicle Card: false
-AI Temporal Signal: true
+
+# Used only when Initialization Mode is Manual:
 Start Year:
 Start Month:
 Start Day:
 Start Hour:
 Start Minute:
 Start Second:
+
+AI Temporal Signal: true
+Repair Chronicle Card: false
 ```
 
 | Field | What it does |
 |---|---|
-| `Chronicle Enabled` | `true`/`false`. Anything else is treated as `false`. |
-| `Initialization Mode` | `Automatic` starts the story clock at the real current time (America/New_York). `Manual` uses the Start Year/Month/Day/Hour/Minute/Second fields below it; any left blank fall back to the current time for that field. |
+| `Chronicle Enabled` | `true`/`false`. Anything else is treated as `false`. Takes effect any time you change it. |
+| `Initialization Mode` | `Automatic` starts the story clock at the real current time (America/New_York). `Manual` uses the Start Year/Month/Day/Hour/Minute/Second fields below it; any left blank fall back to the current time for that field. **Read only once** — the first time your timeline actually initializes. |
+| `Start Year`/`Month`/`Day`/`Hour`/`Minute`/`Second` | Only used in `Manual` mode, and — like it — **read only once**, the first time the timeline initializes. |
+| `AI Temporal Signal` | Leave `true` to let the AI Dungeon narrator itself help estimate elapsed time, on top of Chronicle's deterministic rules. Set `false` to use only the deterministic rules. Either way, Chronicle never trusts the narrator blindly — see **How Chronicle Thinks** below. Takes effect any time you change it. |
 | `Repair Chronicle Card` | Leave `false` normally. Chronicle detects duplicate temporal-state cards on its own without deleting anything; set this `true` only when you explicitly want duplicates removed, then set it back to `false`. |
-| `AI Temporal Signal` | Leave `true` to let the AI Dungeon narrator itself help estimate elapsed time, on top of Chronicle's deterministic rules. Set `false` to use only the deterministic rules. Either way, Chronicle never trusts the narrator blindly — see **How Chronicle Thinks** below. |
 
-⚠️ **Don't edit the Start Year/Month/Day/Hour/Minute/Second fields once your story has already started.** Chronicle intentionally never re-reads them after first use, so it won't silently reset an active timeline.
+⚠️ **Once your timeline has initialized (your first turn has been processed), `Initialization Mode`
+and the Start fields do nothing if you change them again.** They're consumed exactly once, at the
+moment the timeline is born — so pick `Manual` *before* your first turn if you want it, not after.
+This is also what makes it safe to leave this card alone forever afterward: nothing you do to it can
+reset an active story clock.
 
-**For your first-ever test, use `Manual` instead of `Automatic`, with fixed values:**
+**For your first-ever test, use `Manual` instead of `Automatic`, with fixed values, before playing:**
 
 ```
 Chronicle Enabled: true
 Initialization Mode: Manual
-Repair Chronicle Card: false
-AI Temporal Signal: true
 Start Year: 2026
 Start Month: 9
 Start Day: 16
 Start Hour: 18
 Start Minute: 0
 Start Second: 0
+AI Temporal Signal: true
+Repair Chronicle Card: false
 ```
 
 **Upgrading from an older Chronicle version?** If you already have a `chronicle-configuration` card
 from before, Chronicle finds it automatically, renames/retypes it to `Configure Chronicle` / `Class`,
 and moves any settings that were in its Notes into the new Entry field — your existing values are
 preserved, and no second card is created.
+
+**If this card is ever missing** (deleted by accident, or the platform simply hasn't run Chronicle's
+scripts yet for your adventure), Chronicle recreates it the next time it runs — this is a recovery
+measure, not the normal way you're expected to encounter this card, and it never resets an
+already-initialized timeline.
 
 This gives you an exact, predictable expected value for the smoke test above — `2026/09/16 18:00:00`
 — instead of "whatever time it is right now," which also rules out any `Automatic`/timezone

@@ -203,12 +203,15 @@ const UNSUPPORTED_RANGE_ERROR = "Chronicle rejected the last beat's elapsed time
 const CONFIGURATION_CARD_ERROR = "Chronicle could not create or update its \"Configure Chronicle\" Story Card unexpectedly. Chronicle is paused this turn; canonical time (if any) is unaffected.";
 
 /**
- * Auto-creates the canonical "Configure Chronicle" card on first use, and normalizes/
- * migrates one found in a legacy shape, so the creator never has to build the card by
- * hand (D0 Story Card integration corrective pass). Runs on every hook, before the
- * enabled check, so a freshly created card's default `Chronicle Enabled: true` takes
- * effect the very same turn. A failure here must never crash the turn: it is reported
- * through the same runtime-error channel as every other Chronicle diagnostic.
+ * Ensures the canonical "Configure Chronicle" card exists and is in canonical shape.
+ * The intended product flow (D-031) is that this card is already present -- Automatic,
+ * enabled -- as the last configuration checkpoint before the story's timeline starts,
+ * so this call's create/migrate branches exist as *recovery* for the card being
+ * unexpectedly missing or still legacy-shaped, not as the normal onboarding path.
+ * It still runs on every hook, before the enabled check, so that recovery (and a
+ * freshly recovered card's default `Chronicle Enabled: true`) takes effect the same
+ * turn it's needed. A failure here must never crash the turn: it is reported through
+ * the same runtime-error channel as every other Chronicle diagnostic.
  */
 function ensureConfigurationCardForContext(context: AIDungeonHookContext): void {
   if (context.storyCards === undefined) return;

@@ -202,53 +202,70 @@ session (wrong paste order, Library tab not saved, a Library-level script error)
 silently: Input/Context/Output all still return your original text unmodified, with no error shown.
 If Chronicle appears to do nothing after installation, this is the first thing to check.
 
-## 3. Play one turn — Chronicle creates its own configuration card
+## 3. `Configure Chronicle` — your last checkpoint before the story begins
 
-You do not create the configuration card yourself. You don't need to pick a card **Type**, decide
-what **Keys**/**Triggers** mean, or know anything about AI Dungeon's scripting API. Just play (or
-Continue) one turn in your Scenario.
+You do not create the configuration card yourself, and you don't need to pick a card **Type**,
+decide what **Keys**/**Triggers** mean, or know anything about AI Dungeon's scripting API.
+**`Configure Chronicle`** (Type `Class`) is meant to already be sitting in your Story Cards by the
+time your adventure's opening scene appears — before you've typed a single action — ready to use
+exactly as it is:
 
-On that first turn, Chronicle automatically creates a Story Card named **`Configure Chronicle`**
-(Type `Class`). It is enabled by default — Chronicle starts running immediately, using the current
-real-world time (`America/New_York`) as its starting point. You only ever open this card if you
-want to change a setting.
+- `Chronicle Enabled: true` — Chronicle is already on.
+- `Initialization Mode: Automatic` — it will start the story clock from the current real-world time
+  the moment your first turn is actually processed.
+
+**If that's what you want, you can ignore this card completely and just start playing.** Open it
+only if you want a custom starting date/time: switch `Initialization Mode` to `Manual` and fill in
+the Start fields, **before playing your first turn** — see below for why that timing matters.
 
 Its **Entry** (the editable part) looks like this:
 
 ```
 Chronicle Enabled: true
+
+# Choose your starting mode before playing the first turn:
 Initialization Mode: Automatic
-Repair Chronicle Card: false
-AI Temporal Signal: true
+
+# Used only when Initialization Mode is Manual:
 Start Year:
 Start Month:
 Start Day:
 Start Hour:
 Start Minute:
 Start Second:
+
+AI Temporal Signal: true
+Repair Chronicle Card: false
 ```
 
 Field reference — edit values in **Entry**, never in Notes:
 
-- `Chronicle Enabled` — `true`/`false`. Anything else is treated as `false`.
+- `Chronicle Enabled` — `true`/`false`. Anything else is treated as `false`. Takes effect any time
+  you change it, before or after the timeline has started.
 - `Initialization Mode` — `Automatic` starts the story clock at the real current time in the
   `America/New_York` zone (**requires in-app validation** — `Intl.DateTimeFormat` behavior in the
   sandbox is unconfirmed). `Manual` uses the Start Year/Month/Day/Hour/Minute/Second fields below it;
-  any left blank fall back to the current time for that component.
+  any left blank fall back to the current time for that component. **Read only once** — the first
+  time Chronicle actually processes a turn and initializes its timeline.
+- `Start Year`/`Month`/`Day`/`Hour`/`Minute`/`Second` — only used when `Initialization Mode` is
+  `Manual`, and, like it, **read only once**, the first time the timeline initializes.
+- `AI Temporal Signal` — leave `true` unless you want Chronicle to use only its deterministic rules.
+  Either setting keeps the same safety guarantees; this only changes whether the AI Dungeon narrator's
+  own judgment is asked to supplement them (see `agent_documentation/04_decisions.md`, D-026). Takes
+  effect any time you change it.
 - `Repair Chronicle Card` — leave `false` normally. Chronicle detects (but does not delete) duplicate
   temporal-state cards on its own; set this `true` only when you explicitly want duplicates removed,
   then set it back to `false`.
-- `AI Temporal Signal` — leave `true` unless you want Chronicle to use only its deterministic rules.
-  Either setting keeps the same safety guarantees; this only changes whether the AI Dungeon narrator's
-  own judgment is asked to supplement them (see `agent_documentation/04_decisions.md`, D-026).
 
 The card's **Notes** field is documentation only — an explanation of each setting and basic
 troubleshooting. Chronicle never reads settings from Notes on a canonical card; it only exists to
 help you fill in Entry correctly.
 
-**Do not edit the Start Year/Month/Day/Hour/Minute/Second fields once the story has started.**
-Chronicle intentionally never re-reads them after first use, to avoid silently resetting an active
-timeline.
+**Once the timeline has initialized (your first turn has been processed), editing `Initialization
+Mode` or the Start fields again does nothing.** They are consumed exactly once, at the moment the
+timeline is born, precisely so you can freely revisit this card afterward without ever risking a
+silent reset. This is why Manual, if you want it, needs to be chosen *before* that first turn, not
+after.
 
 **For your first-ever test, switch `Initialization Mode` to `Manual` and fill in fixed values**
 before playing your first turn:
@@ -256,14 +273,14 @@ before playing your first turn:
 ```
 Chronicle Enabled: true
 Initialization Mode: Manual
-Repair Chronicle Card: false
-AI Temporal Signal: true
 Start Year: 2026
 Start Month: 9
 Start Day: 16
 Start Hour: 18
 Start Minute: 0
 Start Second: 0
+AI Temporal Signal: true
+Repair Chronicle Card: false
 ```
 
 This gives the smoke test below (section 4) an exact, predictable expected value —
@@ -271,20 +288,32 @@ This gives the smoke test below (section 4) an exact, predictable expected value
 `Automatic`'s `Intl.DateTimeFormat`/timezone dependency (itself one of the things this first test is
 meant to help confirm, not something you want as a confound while checking Chronicle itself).
 `Automatic` is the normal, recommended mode for everyday play once installation is confirmed
-working — switch back to it (or start a fresh Scenario/config card; see the warning above about not
-editing an active story's initialization fields) whenever you like after this first test.
+working — switch back to it for your next Scenario (a running story's mode cannot change once
+initialized, per the one-shot behavior above) whenever you like after this first test.
 
 **Already have an older `chronicle-configuration` card from a previous version?** Nothing to do —
 Chronicle finds it automatically (by its old `keys` identifier), renames/retypes it to the new
 `Configure Chronicle` / `Class` card, and moves any settings that were in its Notes into the new
 Entry, preserving your existing values. It does not create a second card.
 
+**If the card is ever missing** (deleted by accident, or this is your very first turn and the
+platform hasn't run Chronicle's scripts before now — see the caveat below), Chronicle recreates it
+automatically the moment it next runs, as a recovery measure, not as the normal way this card is
+meant to appear. Recreating it never resets an already-initialized timeline.
+
+<sub>Whether AI Dungeon runs a Scenario's scripts (and so creates this card) before the player's very
+first typed action, or only once that action is submitted, is a platform behavior Chronicle cannot
+independently confirm from outside a running session — the same class of open question as the
+"Library load order" assumption below. Practically: open the Story Cards list right after creating
+your Scenario, before typing anything, to check.</sub>
+
 ## 4. Smoke test: confirm Chronicle initialized
 
 This is the one check every install should run before anything else — it tells you, in under a
 minute, whether Chronicle is actually active or only appears to be installed.
 
-1. Play (or Continue) one turn in your Scenario (same turn as section 3 above).
+1. Play (or Continue) one turn in your Scenario, with the Manual example from section 3 above
+   already in place.
 2. Open your Story Cards and look for a card named **`Chronicle Temporal State`**.
 3. Its entry should read:
    ```
