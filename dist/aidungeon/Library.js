@@ -647,7 +647,8 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
 
   // src/aidungeon/story-cards/chronicle-story-card.ts
   var CHRONICLE_STORY_CARD_KEY = "chronicle-temporal-state";
-  var CHRONICLE_STORY_CARD_TYPE = "story";
+  var CHRONICLE_STORY_CARD_TITLE = "Chronicle Temporal State";
+  var CHRONICLE_STORY_CARD_TYPE = "class";
   var MAX_STORY_CARD_LEDGER_RECORDS = 20;
   function renderChronicleStoryCardEntry(state) {
     return renderChronicleTemporalContext(state.currentDateTime);
@@ -668,6 +669,7 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
   function createChronicleStoryCardProjection(state, ledger) {
     return Object.freeze({
       keys: CHRONICLE_STORY_CARD_KEY,
+      title: CHRONICLE_STORY_CARD_TITLE,
       entry: renderChronicleStoryCardEntry(state),
       type: CHRONICLE_STORY_CARD_TYPE,
       notes: renderChronicleStoryCardNotes(ledger)
@@ -679,9 +681,17 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
   function findChronicleStoryCardIndices(storyCards) {
     const indices = [];
     storyCards.forEach((card, index) => {
-      if (card.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY)) indices.push(index);
+      if (matchesChronicleStoryCard(card)) indices.push(index);
     });
     return Object.freeze(indices);
+  }
+  function matchesChronicleStoryCard(card) {
+    var _a;
+    if (normalizedTitle(card.title) === CHRONICLE_STORY_CARD_TITLE.toLowerCase()) return true;
+    return ((_a = card.keys) != null ? _a : "").split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY);
+  }
+  function normalizedTitle(title) {
+    return (title != null ? title : "").trim().toLowerCase();
   }
   function renderLedgerRecord(record) {
     return {
@@ -708,17 +718,17 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
       }
       for (const index of matchingIndices.slice(1).reverse()) runtime.removeStoryCard(index);
       runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
-      writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
+      writeExperimentalFields(runtime.storyCards[existingIndex], projection);
       return Object.freeze({ status: "repaired", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
     }
     if (existingIndex !== void 0) {
       runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
-      writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
+      writeExperimentalFields(runtime.storyCards[existingIndex], projection);
       return Object.freeze({ status: matchingIndices.length > 1 ? "duplicate-detected" : "updated", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
     }
     const createdIndex = runtime.addStoryCard(projection.keys, projection.entry, projection.type);
     if (createdIndex !== false && runtime.storyCards[createdIndex] !== void 0) {
-      writeExperimentalNotes(runtime.storyCards[createdIndex], projection.notes);
+      writeExperimentalFields(runtime.storyCards[createdIndex], projection);
       return Object.freeze({ status: "created", cardIndex: createdIndex, notesWriteAttempted: true, duplicateCount: 1 });
     }
     const recoveredIndex = findChronicleStoryCardIndex(runtime.storyCards);
@@ -726,25 +736,166 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
       throw new Error("Chronicle Story Card could not be created or recovered.");
     }
     runtime.updateStoryCard(recoveredIndex, projection.keys, projection.entry, projection.type);
-    writeExperimentalNotes(runtime.storyCards[recoveredIndex], projection.notes);
+    writeExperimentalFields(runtime.storyCards[recoveredIndex], projection);
     return Object.freeze({ status: "recovered", cardIndex: recoveredIndex, notesWriteAttempted: true, duplicateCount: 1 });
   }
-  function writeExperimentalNotes(card, notes) {
-    card.description = notes;
+  function writeExperimentalFields(card, projection) {
+    card.title = projection.title;
+    card.description = projection.notes;
   }
 
   // src/aidungeon/story-cards/chronicle-configuration.ts
+  var CHRONICLE_CONFIGURATION_TITLE = "Configure Chronicle";
   var CHRONICLE_CONFIGURATION_KEY = "chronicle-configuration";
+  var CHRONICLE_CONFIGURATION_TYPE = "class";
+  var FIELD_LABELS = [
+    ["chronicle enabled", "Chronicle Enabled"],
+    ["initialization mode", "Initialization Mode"],
+    ["repair chronicle card", "Repair Chronicle Card"],
+    ["ai temporal signal", "AI Temporal Signal"],
+    ["start year", "Start Year"],
+    ["start month", "Start Month"],
+    ["start day", "Start Day"],
+    ["start hour", "Start Hour"],
+    ["start minute", "Start Minute"],
+    ["start second", "Start Second"]
+  ];
+  var RECOGNIZED_SETTING_KEYS = FIELD_LABELS.map(([key]) => key);
+  var DEFAULT_SETTINGS = Object.freeze({
+    "chronicle enabled": "true",
+    "initialization mode": "Automatic",
+    "repair chronicle card": "false",
+    "ai temporal signal": "true",
+    "start year": "",
+    "start month": "",
+    "start day": "",
+    "start hour": "",
+    "start minute": "",
+    "start second": ""
+  });
+  function renderConfigurationEntry(values = DEFAULT_SETTINGS) {
+    return FIELD_LABELS.map(([key, label]) => {
+      var _a;
+      return `${label}: ${(_a = values[key]) != null ? _a : DEFAULT_SETTINGS[key]}`;
+    }).join("\n");
+  }
+  var CHRONICLE_CONFIGURATION_DEFAULT_ENTRY = renderConfigurationEntry();
+  var CHRONICLE_CONFIGURATION_NOTES = `# Chronicle keeps a private in-story calendar and estimates how much time
+# passes during each turn. This card lets you configure it; you don't need to
+# know anything about AI Dungeon's scripting API to use it.
+#
+# Edit the fields in this card's Entry (not this Notes text) to change
+# settings:
+#
+# - Chronicle Enabled: set to false to pause Chronicle without losing its
+#   saved timeline.
+# - Initialization Mode: "Automatic" starts the story clock from the
+#   current real-world New York date/time as a convenience seed (the
+#   in-story time itself stays fictional and timezone-free afterward).
+#   Set to "Manual" to instead choose your own starting date/time below.
+# - Start Year / Month / Day / Hour / Minute / Second: only used when
+#   Initialization Mode is "Manual". Leave any of them blank to fall back
+#   to the current New York value for that field.
+# - Repair Chronicle Card: set to true only if Chronicle reports duplicate
+#   "Chronicle Temporal State" cards, to remove the extras. Set it back to
+#   false afterward; it is a one-time action, not a persistent mode.
+# - AI Temporal Signal: when true (recommended), the AI Dungeon narrator
+#   itself reports how much time each reply covers, and Chronicle
+#   cross-checks that against its own rules. Set to false to use only
+#   Chronicle's built-in rules.
+#
+# IMPORTANT: do not change the Start Year/Month/Day/Hour/Minute/Second
+# fields once your story has an active timeline. They are only read the
+# very first time Chronicle initializes. Start a new adventure (or a
+# future explicit reset workflow) if you want a different starting time.
+#
+# Troubleshooting: if Chronicle stops updating time, check that
+# "Chronicle Enabled" is true above and that no other card also uses the
+# name "Configure Chronicle". If you see an error mentioning duplicate
+# cards, set "Repair Chronicle Card" to true for one turn.`;
+  var DISABLED_DEFAULT = Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false, aiTemporalSignal: true });
+  function findChronicleConfigurationCardIndex(storyCards) {
+    const byTitle = storyCards.findIndex((card) => normalizedTitle2(card.title) === CHRONICLE_CONFIGURATION_TITLE.toLowerCase());
+    if (byTitle !== -1) return byTitle;
+    const byKeys = storyCards.findIndex((card) => {
+      var _a;
+      return ((_a = card.keys) != null ? _a : "").split(",").map((key) => key.trim()).includes(CHRONICLE_CONFIGURATION_KEY);
+    });
+    return byKeys !== -1 ? byKeys : void 0;
+  }
   function readChronicleConfiguration(cards, currentDateTime) {
-    var _a, _b, _c, _d, _e;
-    const card = cards.find((candidate) => candidate.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_CONFIGURATION_KEY));
-    if (card === void 0) return Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false, aiTemporalSignal: true });
-    const values = parseLines((_a = card.description) != null ? _a : "");
-    const enabled2 = ((_b = values["chronicle enabled"]) != null ? _b : "true").toLowerCase() === "true";
-    const mode = ((_c = values["initialization mode"]) != null ? _c : "automatic").toLowerCase() === "manual" ? "manual" : "automatic";
-    const repairChronicleCard = ((_d = values["repair chronicle card"]) != null ? _d : "false").toLowerCase() === "true";
-    const aiTemporalSignal = ((_e = values["ai temporal signal"]) != null ? _e : "true").toLowerCase() === "true";
-    const manual = mode === "manual" ? readManualDateTime(values, currentDateTime != null ? currentDateTime : runtimeDateTime()) : void 0;
+    var _a, _b;
+    const index = findChronicleConfigurationCardIndex(cards);
+    if (index === void 0) return DISABLED_DEFAULT;
+    const card = cards[index];
+    const notesValues = pickRecognized(parseLines((_a = card.description) != null ? _a : ""));
+    const entryValues = pickRecognized(parseLines((_b = card.entry) != null ? _b : ""));
+    const values = { ...notesValues, ...entryValues };
+    return buildConfiguration(values, currentDateTime != null ? currentDateTime : runtimeDateTime());
+  }
+  function ensureChronicleConfigurationCard(runtime) {
+    const index = findChronicleConfigurationCardIndex(runtime.storyCards);
+    if (index === void 0) {
+      return Object.freeze({ cardIndex: createConfigurationCard(runtime), status: "created" });
+    }
+    const migrated = normalizeConfigurationCard(runtime.storyCards[index]);
+    return Object.freeze({ cardIndex: index, status: migrated ? "migrated" : "existing" });
+  }
+  function createConfigurationCard(runtime) {
+    var _a;
+    const createdIndex = runtime.addStoryCard(CHRONICLE_CONFIGURATION_KEY, CHRONICLE_CONFIGURATION_DEFAULT_ENTRY, CHRONICLE_CONFIGURATION_TYPE);
+    const index = createdIndex !== false && runtime.storyCards[createdIndex] !== void 0 ? createdIndex : findChronicleConfigurationCardIndex(runtime.storyCards);
+    if (index === void 0) throw new Error("Chronicle configuration card could not be created or recovered.");
+    const card = runtime.storyCards[index];
+    card.title = CHRONICLE_CONFIGURATION_TITLE;
+    card.type = CHRONICLE_CONFIGURATION_TYPE;
+    if (((_a = card.entry) != null ? _a : "") === "") card.entry = CHRONICLE_CONFIGURATION_DEFAULT_ENTRY;
+    card.description = CHRONICLE_CONFIGURATION_NOTES;
+    return index;
+  }
+  function normalizeConfigurationCard(card) {
+    var _a, _b, _c;
+    let changed = false;
+    if (card.type !== CHRONICLE_CONFIGURATION_TYPE) {
+      card.type = CHRONICLE_CONFIGURATION_TYPE;
+      changed = true;
+    }
+    if (normalizedTitle2(card.title) !== CHRONICLE_CONFIGURATION_TITLE.toLowerCase()) {
+      card.title = CHRONICLE_CONFIGURATION_TITLE;
+      changed = true;
+    }
+    const keyList = ((_a = card.keys) != null ? _a : "").split(",").map((key) => key.trim()).filter((key) => key.length > 0);
+    if (!keyList.includes(CHRONICLE_CONFIGURATION_KEY)) {
+      card.keys = [...keyList, CHRONICLE_CONFIGURATION_KEY].join(",");
+      changed = true;
+    }
+    const entryValues = parseLines((_b = card.entry) != null ? _b : "");
+    const notesValues = parseLines((_c = card.description) != null ? _c : "");
+    const entryHasRecognizedSettings = RECOGNIZED_SETTING_KEYS.some((key) => entryValues[key] !== void 0);
+    const notesHasRecognizedSettings = RECOGNIZED_SETTING_KEYS.some((key) => notesValues[key] !== void 0);
+    if (!entryHasRecognizedSettings) {
+      card.entry = renderConfigurationEntry({ ...DEFAULT_SETTINGS, ...pickRecognized(notesValues) });
+      changed = true;
+    }
+    if (notesHasRecognizedSettings || isKnownNotesTemplate(card.description)) {
+      if (card.description !== CHRONICLE_CONFIGURATION_NOTES) {
+        card.description = CHRONICLE_CONFIGURATION_NOTES;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+  function isKnownNotesTemplate(description) {
+    const trimmed = (description != null ? description : "").trim();
+    return trimmed === "" || trimmed.startsWith("# Chronicle");
+  }
+  function buildConfiguration(values, currentDateTime) {
+    var _a, _b, _c, _d;
+    const enabled2 = ((_a = values["chronicle enabled"]) != null ? _a : "true").toLowerCase() === "true";
+    const mode = ((_b = values["initialization mode"]) != null ? _b : "automatic").toLowerCase() === "manual" ? "manual" : "automatic";
+    const repairChronicleCard = ((_c = values["repair chronicle card"]) != null ? _c : "false").toLowerCase() === "true";
+    const aiTemporalSignal = ((_d = values["ai temporal signal"]) != null ? _d : "true").toLowerCase() === "true";
+    const manual = mode === "manual" ? readManualDateTime(values, currentDateTime) : void 0;
     return Object.freeze({ enabled: enabled2, mode, initialDateTime: manual == null ? void 0 : manual.initialDateTime, repairChronicleCard, aiTemporalSignal, error: manual == null ? void 0 : manual.error });
   }
   function runtimeDateTime(now = /* @__PURE__ */ new Date()) {
@@ -764,9 +915,17 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
     };
     return { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute"), second: value("second") };
   }
-  function parseLines(notes) {
+  function normalizedTitle2(title) {
+    return (title != null ? title : "").trim().toLowerCase();
+  }
+  function pickRecognized(values) {
+    const picked = {};
+    for (const key of RECOGNIZED_SETTING_KEYS) if (values[key] !== void 0) picked[key] = values[key];
+    return picked;
+  }
+  function parseLines(text) {
     const values = {};
-    for (const line of notes.split(/\r?\n/)) {
+    for (const line of text.split(/\r?\n/)) {
       const separator = line.indexOf(":");
       if (separator > 0) values[line.slice(0, separator).trim().toLowerCase()] = line.slice(separator + 1).trim();
     }
@@ -843,6 +1002,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     return Object.freeze({
       onInput(text, context) {
         clearChronicleNotification(context.state);
+        ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         if (!enabled(context)) return nonEmptyText(text);
         const current = ensureInitialized(context);
@@ -850,6 +1010,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
         return nonEmptyText(text);
       },
       onContext(text, context) {
+        ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         if (!enabled(context)) return nonEmptyText(text);
         const current = ensureInitialized(context);
@@ -867,6 +1028,7 @@ ${text}`);
       onOutput(text, context) {
         var _a, _b, _c;
         clearChronicleNotification(context.state);
+        ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         const safeText = stripModelTemporalSignal(text);
         if (!enabled(context)) return nonEmptyText(safeText);
@@ -941,6 +1103,16 @@ ${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock() : with
   }
   var DUPLICATE_CARD_ERROR = "Chronicle has duplicate temporal-state cards. Set Repair Chronicle Card: true in the configuration card to repair them explicitly.";
   var UNSUPPORTED_RANGE_ERROR = "Chronicle rejected the last beat's elapsed time because it would move the story outside the supported year range (0001-9999). Canonical time was not changed.";
+  var CONFIGURATION_CARD_ERROR = 'Chronicle could not create or update its "Configure Chronicle" Story Card unexpectedly. Chronicle is paused this turn; canonical time (if any) is unaffected.';
+  function ensureConfigurationCardForContext(context) {
+    if (context.storyCards === void 0) return;
+    try {
+      ensureChronicleConfigurationCard(context.storyCards);
+      if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === CONFIGURATION_CARD_ERROR) delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
+    } catch (error) {
+      context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `${CONFIGURATION_CARD_ERROR} (${error instanceof Error ? error.message : String(error)})`;
+    }
+  }
   function syncProjection(context, current, force) {
     if (context.storyCards === void 0) return;
     const configuration = readChronicleConfiguration(context.storyCards.storyCards);

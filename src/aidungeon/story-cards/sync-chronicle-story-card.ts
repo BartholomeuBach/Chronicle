@@ -49,19 +49,19 @@ export function syncChronicleStoryCard(
     }
     for (const index of matchingIndices.slice(1).reverse()) runtime.removeStoryCard(index);
     runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
-    writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
+    writeExperimentalFields(runtime.storyCards[existingIndex], projection);
     return Object.freeze({ status: "repaired", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
   }
 
   if (existingIndex !== undefined) {
     runtime.updateStoryCard(existingIndex, projection.keys, projection.entry, projection.type);
-    writeExperimentalNotes(runtime.storyCards[existingIndex], projection.notes);
+    writeExperimentalFields(runtime.storyCards[existingIndex], projection);
     return Object.freeze({ status: matchingIndices.length > 1 ? "duplicate-detected" : "updated", cardIndex: existingIndex, notesWriteAttempted: true, duplicateCount: matchingIndices.length });
   }
 
   const createdIndex = runtime.addStoryCard(projection.keys, projection.entry, projection.type);
   if (createdIndex !== false && runtime.storyCards[createdIndex] !== undefined) {
-    writeExperimentalNotes(runtime.storyCards[createdIndex], projection.notes);
+    writeExperimentalFields(runtime.storyCards[createdIndex], projection);
     return Object.freeze({ status: "created", cardIndex: createdIndex, notesWriteAttempted: true, duplicateCount: 1 });
   }
 
@@ -71,10 +71,17 @@ export function syncChronicleStoryCard(
   }
 
   runtime.updateStoryCard(recoveredIndex, projection.keys, projection.entry, projection.type);
-  writeExperimentalNotes(runtime.storyCards[recoveredIndex], projection.notes);
+  writeExperimentalFields(runtime.storyCards[recoveredIndex], projection);
   return Object.freeze({ status: "recovered", cardIndex: recoveredIndex, notesWriteAttempted: true, duplicateCount: 1 });
 }
 
-function writeExperimentalNotes(card: AiDungeonStoryCard, notes: string): void {
-  card.description = notes;
+/**
+ * `title` and `description` are outside the documented `addStoryCard`/`updateStoryCard`
+ * signature, so they are set by direct object mutation on the card reference returned
+ * from `storyCards[index]` -- the same pattern Inner Self uses (construct via
+ * `addStoryCard`, then assign fields on the returned card object directly).
+ */
+function writeExperimentalFields(card: AiDungeonStoryCard, projection: { readonly title: string; readonly notes: string }): void {
+  card.title = projection.title;
+  card.description = projection.notes;
 }

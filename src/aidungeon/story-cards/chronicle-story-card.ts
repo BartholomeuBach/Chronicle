@@ -3,21 +3,33 @@ import { formatChronicleDateTime } from "../../chronicle/state/format-chronicle-
 import { renderChronicleTemporalContext } from "../../chronicle/state/render-chronicle-temporal-context.js";
 import type { ChronicleState } from "../../chronicle/state/chronicle-state.js";
 
+/** Legacy/reserved identifier kept in `keys` so pre-existing cards are still discoverable by fallback. */
 export const CHRONICLE_STORY_CARD_KEY = "chronicle-temporal-state";
-export const CHRONICLE_STORY_CARD_TYPE = "story";
+/** Primary discovery identifier: the card's Name/Title, as shown in the AI Dungeon Story Card list. */
+export const CHRONICLE_STORY_CARD_TITLE = "Chronicle Temporal State";
+/** "class" is a simple native type validated in community scripts (Inner Self); not a Custom Type. */
+export const CHRONICLE_STORY_CARD_TYPE = "class";
 export const MAX_STORY_CARD_LEDGER_RECORDS = 20;
 
-/** Minimal documented Story Card fields, plus experimental Notes mapping. */
+/**
+ * Story Card fields Chronicle actually reads/writes at runtime. `id`, `keys`, `entry`,
+ * and `type` are documented by the official scripting API. `title` and `description`
+ * (the UI's Name/Notes fields) are a community-observed mapping -- confirmed working in
+ * Inner Self, not yet confirmed by AI Dungeon's own reference -- so they stay optional
+ * and are always read/written defensively.
+ */
 export interface AiDungeonStoryCard {
   readonly id?: string | number;
-  readonly keys: string;
-  readonly entry: string;
-  readonly type: string;
+  keys: string;
+  entry: string;
+  type: string;
+  title?: string;
   description?: string;
 }
 
 export interface ChronicleStoryCardProjection {
   readonly keys: string;
+  readonly title: string;
   readonly entry: string;
   readonly type: string;
   readonly notes: string;
@@ -55,6 +67,7 @@ export function createChronicleStoryCardProjection(
 ): ChronicleStoryCardProjection {
   return Object.freeze({
     keys: CHRONICLE_STORY_CARD_KEY,
+    title: CHRONICLE_STORY_CARD_TITLE,
     entry: renderChronicleStoryCardEntry(state),
     type: CHRONICLE_STORY_CARD_TYPE,
     notes: renderChronicleStoryCardNotes(ledger)
@@ -66,13 +79,27 @@ export function findChronicleStoryCardIndex(storyCards: readonly AiDungeonStoryC
   return findChronicleStoryCardIndices(storyCards)[0];
 }
 
-/** Returns every dedicated Chronicle projection card, in current array order. */
+/**
+ * Returns every dedicated Chronicle projection card, in current array order.
+ * A card matches by its canonical title (primary, case/whitespace-insensitive) or,
+ * for backward compatibility with cards created before the title-based scheme, by the
+ * legacy `chronicle-temporal-state` identifier in `keys` (fallback).
+ */
 export function findChronicleStoryCardIndices(storyCards: readonly AiDungeonStoryCard[]): readonly number[] {
   const indices: number[] = [];
   storyCards.forEach((card, index) => {
-    if (card.keys.split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY)) indices.push(index);
+    if (matchesChronicleStoryCard(card)) indices.push(index);
   });
   return Object.freeze(indices);
+}
+
+function matchesChronicleStoryCard(card: AiDungeonStoryCard): boolean {
+  if (normalizedTitle(card.title) === CHRONICLE_STORY_CARD_TITLE.toLowerCase()) return true;
+  return (card.keys ?? "").split(",").map((key) => key.trim()).includes(CHRONICLE_STORY_CARD_KEY);
+}
+
+function normalizedTitle(title: string | undefined): string {
+  return (title ?? "").trim().toLowerCase();
 }
 
 function renderLedgerRecord(record: TemporalLedgerRecord): object {

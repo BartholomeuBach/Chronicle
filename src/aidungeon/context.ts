@@ -1,16 +1,28 @@
 import { nonEmptyText } from "./non-empty-text.js";
+import { isPlainObject, usableStoryCardGlobals } from "./runtime-guards.js";
 import type { AiDungeonStoryCard } from "./story-cards/chronicle-story-card.js";
 
-declare const text: string;
-declare const state: Record<string, unknown>;
-declare const info: { actionCount?: number; maxChars?: number; memoryLength?: number };
-declare const storyCards: AiDungeonStoryCard[];
-declare const addStoryCard: (keys: string, entry: string, type: string) => number | false;
-declare const updateStoryCard: (index: number, keys: string, entry: string, type: string) => void;
+declare const text: unknown;
+declare const state: unknown;
+declare const info: { actionCount?: number; maxChars?: number; memoryLength?: number } | undefined;
+declare const storyCards: AiDungeonStoryCard[] | undefined;
+declare const addStoryCard: ((keys: string, entry: string, type: string) => number | false) | undefined;
+declare const updateStoryCard: ((index: number, keys: string, entry: string, type: string) => void) | undefined;
 declare const removeStoryCard: ((index: number) => void) | undefined;
 
-const modifier = (value: string) => ({
-  text: globalThis.ChronicleAIDungeon?.onContext(value, { state, actionCount: info.actionCount, maxChars: info.maxChars, memoryLength: info.memoryLength, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : undefined } }) ?? nonEmptyText(value)
-});
+const modifier = (value: unknown) => {
+  const safeText = typeof value === "string" ? value : "";
+  return {
+    text: isPlainObject(state)
+      ? (globalThis.ChronicleAIDungeon?.onContext(safeText, {
+          state,
+          actionCount: info?.actionCount,
+          maxChars: info?.maxChars,
+          memoryLength: info?.memoryLength,
+          storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+        }) ?? nonEmptyText(safeText))
+      : nonEmptyText(safeText)
+  };
+};
 
 modifier(text);

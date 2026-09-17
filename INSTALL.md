@@ -72,11 +72,30 @@ then save again.**
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/input.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(value, { state, actionCount: info.actionCount, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(safeText, {
+           state,
+           actionCount: info == null ? void 0 : info.actionCount,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -96,11 +115,32 @@ then save again.**
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/context.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(value, { state, actionCount: info.actionCount, maxChars: info.maxChars, memoryLength: info.memoryLength, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(safeText, {
+           state,
+           actionCount: info == null ? void 0 : info.actionCount,
+           maxChars: info == null ? void 0 : info.maxChars,
+           memoryLength: info == null ? void 0 : info.memoryLength,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -120,15 +160,30 @@ then save again.**
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/output.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(value, {
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(safeText, {
            state,
-           actionCount: info.actionCount,
-           storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 }
-         })) != null ? _b : nonEmptyText(value)
+           actionCount: info == null ? void 0 : info.actionCount,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -147,40 +202,33 @@ session (wrong paste order, Library tab not saved, a Library-level script error)
 silently: Input/Context/Output all still return your original text unmodified, with no error shown.
 If Chronicle appears to do nothing after installation, this is the first thing to check.
 
-## 3. Create the configuration Story Card
+## 3. Play one turn — Chronicle creates its own configuration card
 
-Chronicle is **disabled by default** until you create this card — a missing card is deliberately
-interpreted as "Chronicle off," not an error.
+You do not create the configuration card yourself. You don't need to pick a card **Type**, decide
+what **Keys**/**Triggers** mean, or know anything about AI Dungeon's scripting API. Just play (or
+Continue) one turn in your Scenario.
 
-Create a new Story Card with:
+On that first turn, Chronicle automatically creates a Story Card named **`Configure Chronicle`**
+(Type `Class`). It is enabled by default — Chronicle starts running immediately, using the current
+real-world time (`America/New_York`) as its starting point. You only ever open this card if you
+want to change a setting.
 
-- **Keys:** `chronicle-configuration`
-- **Notes / description field:** paste the template below, editing only the values you want to change
+Its **Entry** (the editable part) looks like this:
 
 ```
-# Chronicle configuration
-# IMPORTANT: do not change initialization fields during an active story.
-# Existing Chronicle state intentionally remains unchanged. Start a new adventure
-# or use a future explicit reset workflow when you need a new timeline.
 Chronicle Enabled: true
 Initialization Mode: Automatic
-# Manual fields are optional; blank fields use the current New York time.
-# Start Year:
-# Start Month:
-# Start Day:
-# Start Hour:
-# Start Minute:
-# Start Second:
-# Set true only to explicitly remove duplicate Chronicle temporal-state cards.
 Repair Chronicle Card: false
-# Lets the AI Dungeon narrator itself signal elapsed time for a completed beat,
-# with its own high/medium/low confidence (D-026); Chronicle always falls back
-# to its deterministic rules when the signal is absent, malformed, ambiguous,
-# or contradicted by the story so far. Set false to use only the deterministic rules.
 AI Temporal Signal: true
+Start Year:
+Start Month:
+Start Day:
+Start Hour:
+Start Minute:
+Start Second:
 ```
 
-Field reference:
+Field reference — edit values in **Entry**, never in Notes:
 
 - `Chronicle Enabled` — `true`/`false`. Anything else is treated as `false`.
 - `Initialization Mode` — `Automatic` starts the story clock at the real current time in the
@@ -194,22 +242,28 @@ Field reference:
   Either setting keeps the same safety guarantees; this only changes whether the AI Dungeon narrator's
   own judgment is asked to supplement them (see `agent_documentation/04_decisions.md`, D-026).
 
-**Do not edit the initialization fields once the story has started.** Chronicle intentionally never
-re-reads them after first use, to avoid silently resetting an active timeline.
+The card's **Notes** field is documentation only — an explanation of each setting and basic
+troubleshooting. Chronicle never reads settings from Notes on a canonical card; it only exists to
+help you fill in Entry correctly.
 
-**For your first-ever test, use `Manual` with fixed values instead of `Automatic`:**
+**Do not edit the Start Year/Month/Day/Hour/Minute/Second fields once the story has started.**
+Chronicle intentionally never re-reads them after first use, to avoid silently resetting an active
+timeline.
+
+**For your first-ever test, switch `Initialization Mode` to `Manual` and fill in fixed values**
+before playing your first turn:
 
 ```
 Chronicle Enabled: true
 Initialization Mode: Manual
+Repair Chronicle Card: false
+AI Temporal Signal: true
 Start Year: 2026
 Start Month: 9
 Start Day: 16
 Start Hour: 18
 Start Minute: 0
 Start Second: 0
-Repair Chronicle Card: false
-AI Temporal Signal: true
 ```
 
 This gives the smoke test below (section 4) an exact, predictable expected value —
@@ -220,13 +274,18 @@ meant to help confirm, not something you want as a confound while checking Chron
 working — switch back to it (or start a fresh Scenario/config card; see the warning above about not
 editing an active story's initialization fields) whenever you like after this first test.
 
-## 4. Smoke test: play one turn and confirm Chronicle initialized
+**Already have an older `chronicle-configuration` card from a previous version?** Nothing to do —
+Chronicle finds it automatically (by its old `keys` identifier), renames/retypes it to the new
+`Configure Chronicle` / `Class` card, and moves any settings that were in its Notes into the new
+Entry, preserving your existing values. It does not create a second card.
+
+## 4. Smoke test: confirm Chronicle initialized
 
 This is the one check every install should run before anything else — it tells you, in under a
 minute, whether Chronicle is actually active or only appears to be installed.
 
-1. Play (or Continue) one turn in your Scenario.
-2. Open your Story Cards and look for a card named **`chronicle-temporal-state`**.
+1. Play (or Continue) one turn in your Scenario (same turn as section 3 above).
+2. Open your Story Cards and look for a card named **`Chronicle Temporal State`**.
 3. Its entry should read:
    ```
    [Chronicle]
@@ -236,17 +295,20 @@ minute, whether Chronicle is actually active or only appears to be installed.
    (using the recommended Manual example from section 3 above) — or a little later than that, if
    your first action already gave Chronicle evidence that some time passed during it.
 
-**If that card never appears:** see "5. If something looks wrong" below — most likely cause is the
-`chronicle-configuration` card being missing/misspelled, or Library not having been saved before the
-other tabs (section 2).
+**If that card never appears:** see "5. If something looks wrong" below — most likely cause is
+Library not having been saved before the other tabs (section 2), or `Chronicle Enabled` having been
+switched to `false` on the `Configure Chronicle` card.
 
-- **Locally validated:** on the first enabled turn, Chronicle creates that second Story Card
-  (`chronicle-temporal-state`) showing only the current in-story date/time — no Ledger history, no
-  confidence scores, nothing else. The model's context gains a compact three-line `[Chronicle]`
-  block with the same current time. Both are proven by automated tests
-  (`tests/aidungeon-runtime.test.ts`, `tests/aidungeon/story-cards/`).
-- **Requires in-app validation:** whether the `chronicle-temporal-state` card's Notes field actually
-  shows the bounded Ledger history you'd expect, whether `state.message` renders as a visible
+- **Locally validated:** on the first enabled turn, Chronicle creates both the `Configure Chronicle`
+  card (if none existed yet) and the `Chronicle Temporal State` card showing only the current
+  in-story date/time — no Ledger history, no confidence scores, nothing else. The model's context
+  gains a compact three-line `[Chronicle]` block with the same current time. Both are proven by
+  automated tests (`tests/aidungeon-runtime.test.ts`, `tests/aidungeon/story-cards/`).
+- **Requires in-app validation:** whether the `Chronicle Temporal State` card's Notes field actually
+  shows the bounded Ledger history you'd expect, whether card **Title** is readable/settable the way
+  Chronicle's card-discovery logic assumes (the `title`/`description` Story Card fields are a
+  community-observed mapping, not part of AI Dungeon's official documented API — see
+  `agent_documentation/03_ai_dungeon_integration.md`), whether `state.message` renders as a visible
   toast/popup for a time-of-day transition, and whether the AI Dungeon narrator actually honors the
   injected `<<chronicle:...>>` signal instruction. None of these are assumed working — see
   `agent_documentation/10_in_app_validation_playbook.md` for the full test matrix to run yourself,
@@ -258,11 +320,17 @@ other tabs (section 2).
 Chronicle surfaces problems through a transient `state.chronicleRuntimeError` diagnostic rather than
 crashing a turn. If play feels wrong and you have script/state inspection access, check that key
 first — its message is written to explain what happened (invalid persisted state, a duplicate Story
-Card, an unsupported time range, or an unexpected internal error) rather than failing silently.
-Two situations remain genuinely silent by design and are not diagnosed this way:
+Card, a configuration card that could not be created, an unsupported time range, or an unexpected
+internal error) rather than failing silently.
 
-- **No configuration card** — Chronicle is simply off, as intended; nothing is broken.
-- **Library not evaluated first** (see step 2) — every hook passes text through unmodified.
+One situation remains genuinely silent by design and is not diagnosed this way: **Library not
+evaluated first** (see step 2) — every hook passes text through unmodified, and Chronicle never gets
+a chance to run at all, including its own configuration-card creation.
+
+If a hook ever runs with a missing or malformed `state`, `storyCards`, `addStoryCard`, or
+`updateStoryCard` global (an AI Dungeon runtime irregularity, not a normal condition), Chronicle
+degrades to a safe passthrough for that hook instead of erroring the turn — see
+`agent_documentation/05_known_limitations.md`.
 
 ## What this package does not include yet
 

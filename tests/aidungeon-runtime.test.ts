@@ -244,6 +244,49 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toBeUndefined();
   });
 
+  it("auto-creates the canonical configuration card on first use, and Chronicle activates the same turn (D0 corrective pass)", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+
+    expect(createChronicleRuntime().onInput("I wake up.", { state, actionCount: 1, storyCards })).toBe("I wake up.");
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].title).toBe("Configure Chronicle");
+    expect(state.chronicleRuntime).toBeDefined(); // Chronicle Enabled defaults to true, so it initializes immediately
+  });
+
+  it("migrates a legacy chronicle-configuration card found only by keys, preserving its settings", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [{ keys: "chronicle-configuration", entry: "", type: "story", description: "Chronicle Enabled: false" }];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+
+    createChronicleRuntime().onInput("I wait.", { state, actionCount: 1, storyCards });
+
+    expect(cards).toHaveLength(1); // migrated in place, not duplicated
+    expect(cards[0].title).toBe("Configure Chronicle");
+    expect(cards[0].entry).toContain("Chronicle Enabled: false");
+    expect(state.chronicleRuntime).toBeUndefined(); // still disabled, exactly as the migrated setting says
+  });
+
+  it("does not crash the turn when the configuration card cannot be created or recovered", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [];
+    const storyCards: StoryCardRuntime = { storyCards: cards, addStoryCard: () => false, updateStoryCard: () => {} };
+
+    expect(() => createChronicleRuntime().onInput("I wait.", { state, actionCount: 1, storyCards })).not.toThrow();
+    expect(createChronicleRuntime().onInput("I wait.", { state, actionCount: 1, storyCards })).toBe("I wait.");
+    expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("Configure Chronicle");
+  });
+
   it("carries the Input-captured player action all the way to a confidence boost in the Story Card Notes (Opção A, wired as in library.ts)", () => {
     const state: Record<string, unknown> = {};
     const cards: AiDungeonStoryCard[] = [configurationCard("Chronicle Enabled: true\nInitialization Mode: Manual\nStart Year: 2026\nStart Month: 4\nStart Day: 13\nStart Hour: 19\nStart Minute: 32\nStart Second: 0\nAI Temporal Signal: false")];

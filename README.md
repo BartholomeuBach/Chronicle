@@ -145,11 +145,30 @@ Chronicle exists so the narrator stops having to guess what time it is.
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/input.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(value, { state, actionCount: info.actionCount, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onInput(safeText, {
+           state,
+           actionCount: info == null ? void 0 : info.actionCount,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -169,11 +188,32 @@ Chronicle exists so the narrator stops having to guess what time it is.
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/context.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(value, { state, actionCount: info.actionCount, maxChars: info.maxChars, memoryLength: info.memoryLength, storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 } })) != null ? _b : nonEmptyText(value)
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onContext(safeText, {
+           state,
+           actionCount: info == null ? void 0 : info.actionCount,
+           maxChars: info == null ? void 0 : info.maxChars,
+           memoryLength: info == null ? void 0 : info.memoryLength,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -193,15 +233,30 @@ Chronicle exists so the narrator stops having to guess what time it is.
        return text2 === "" ? "\u200B" : text2;
      }
 
+     // src/aidungeon/runtime-guards.ts
+     function isPlainObject(value) {
+       return typeof value === "object" && value !== null && !Array.isArray(value);
+     }
+     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
+       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
+       return {
+         storyCards: storyCards2,
+         addStoryCard: addStoryCard2,
+         updateStoryCard: updateStoryCard2,
+         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
+       };
+     }
+
      // src/aidungeon/output.ts
      var modifier = (value) => {
        var _a, _b;
+       const safeText = typeof value === "string" ? value : "";
        return {
-         text: (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(value, {
+         text: isPlainObject(state) ? (_b = (_a = globalThis.ChronicleAIDungeon) == null ? void 0 : _a.onOutput(safeText, {
            state,
-           actionCount: info.actionCount,
-           storyCards: { storyCards, addStoryCard, updateStoryCard, removeStoryCard: typeof removeStoryCard === "function" ? removeStoryCard : void 0 }
-         })) != null ? _b : nonEmptyText(value)
+           actionCount: info == null ? void 0 : info.actionCount,
+           storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
+         })) != null ? _b : nonEmptyText(safeText) : nonEmptyText(safeText)
        };
      };
      modifier(text);
@@ -210,10 +265,19 @@ Chronicle exists so the narrator stops having to guess what time it is.
    <!-- chronicle:dist-embed:Output:end -->
 
 10. Click **SAVE** again, now that all four tabs are pasted.
-11. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**. **For your very first test**, use the `Manual` initialization example further down in that section instead of the default `Automatic` — it makes what Chronicle should show you exact and predictable, with no timezone guesswork involved.
-12. **Smoke test — play one turn**, then open your Story Cards and confirm:
-    - a new card named `chronicle-temporal-state` exists;
-    - its entry matches what you set in step 11 — with the recommended Manual example, that's exactly:
+11. **Play (or Continue) one turn.** You don't need to create anything yourself — on this turn,
+    Chronicle automatically creates a Story Card named **`Configure Chronicle`** (Type `Class`),
+    already enabled and running on the real current time. You only open it if you want to change a
+    setting; see the [configuration card](#configuration-card) section below.
+
+    **For your very first test**, before playing that turn, it's easier to open the card *after* it's
+    created and switch `Initialization Mode` to `Manual` with fixed values (see below), then play
+    again — it makes what Chronicle should show you exact and predictable, with no timezone
+    guesswork involved.
+12. **Smoke test**, then open your Story Cards and confirm:
+    - a card named `Configure Chronicle` exists;
+    - a card named `Chronicle Temporal State` also exists;
+    - its entry matches what you set — with the recommended Manual example, that's exactly:
       ```
       [Chronicle]
       Current story time: 2026/09/16 18:00:00.
@@ -221,7 +285,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
       ```
       (or a little later, if your first action already gave Chronicle evidence that time passed).
 
-    If that card never appears, see **Gameplay Tips** below and `INSTALL.md`'s troubleshooting section before assuming your own story is broken.
+    If those cards never appear, see **Gameplay Tips** below and `INSTALL.md`'s troubleshooting section before assuming your own story is broken.
 
 <sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle, and these snippets are kept in sync with it automatically.</sub>
 
@@ -229,35 +293,28 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 Every turn played from that Scenario from now on runs through Chronicle.
 
-<sub>Chronicle stays off until the `chronicle-configuration` card exists — a missing card means "disabled," not broken.</sub>
+<sub>Chronicle is enabled by default from the moment it creates its own `Configure Chronicle` card — set `Chronicle Enabled: false` on that card any time you want to pause it.</sub>
 
 ---
 
 ### Configuration card
 
-Chronicle reads its settings from the `chronicle-configuration` Story Card's Notes. Paste this template in and edit only the values you want to change:
+Chronicle creates and maintains a Story Card named **`Configure Chronicle`** (Type `Class`)
+automatically — you never build this card by hand. Its **Entry** field holds the editable settings;
+its **Notes** field is documentation/help text only and is never read for settings. Edit values
+directly in Entry:
 
 ```
-# Chronicle configuration
-# IMPORTANT: do not change initialization fields during an active story.
-# Existing Chronicle state intentionally remains unchanged. Start a new adventure
-# or use a future explicit reset workflow when you need a new timeline.
 Chronicle Enabled: true
 Initialization Mode: Automatic
-# Manual fields are optional; blank fields use the current New York time.
-# Start Year:
-# Start Month:
-# Start Day:
-# Start Hour:
-# Start Minute:
-# Start Second:
-# Set true only to explicitly remove duplicate Chronicle temporal-state cards.
 Repair Chronicle Card: false
-# Lets the AI Dungeon narrator itself signal elapsed time for a completed beat,
-# with its own high/medium/low confidence (D-026); Chronicle always falls back
-# to its deterministic rules when the signal is absent, malformed, ambiguous,
-# or contradicted by the story so far. Set false to use only the deterministic rules.
 AI Temporal Signal: true
+Start Year:
+Start Month:
+Start Day:
+Start Hour:
+Start Minute:
+Start Second:
 ```
 
 | Field | What it does |
@@ -274,15 +331,20 @@ AI Temporal Signal: true
 ```
 Chronicle Enabled: true
 Initialization Mode: Manual
+Repair Chronicle Card: false
+AI Temporal Signal: true
 Start Year: 2026
 Start Month: 9
 Start Day: 16
 Start Hour: 18
 Start Minute: 0
 Start Second: 0
-Repair Chronicle Card: false
-AI Temporal Signal: true
 ```
+
+**Upgrading from an older Chronicle version?** If you already have a `chronicle-configuration` card
+from before, Chronicle finds it automatically, renames/retypes it to `Configure Chronicle` / `Class`,
+and moves any settings that were in its Notes into the new Entry field — your existing values are
+preserved, and no second card is created.
 
 This gives you an exact, predictable expected value for the smoke test above — `2026/09/16 18:00:00`
 — instead of "whatever time it is right now," which also rules out any `Automatic`/timezone
@@ -294,9 +356,9 @@ test is meant to help confirm) as a confound while you're checking whether Chron
 
 ### Gameplay Tips
 
-- `Library` should be saved before `Input`/`Context`/`Output` are ever exercised (step 6 above) — Chronicle assumes AI Dungeon evaluates `Library` first. If the smoke test's `chronicle-temporal-state` card never appears, this is the first thing to check.
-- No `chronicle-configuration` card means Chronicle is simply off — that's the intended behavior, not a bug.
-- Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `chronicle-temporal-state` Story Card's Notes, for players who want to inspect how the clock got there.
+- `Library` should be saved before `Input`/`Context`/`Output` are ever exercised (step 6 above) — Chronicle assumes AI Dungeon evaluates `Library` first. If the smoke test's `Chronicle Temporal State` card never appears, this is the first thing to check.
+- Set `Chronicle Enabled: false` on the `Configure Chronicle` card any time you want Chronicle off — it pauses without losing its saved timeline.
+- Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `Chronicle Temporal State` Story Card's Notes, for players who want to inspect how the clock got there.
 - Chronicle is early (see **Project Status** below) — not every narrative edge case is handled yet.
 
 ---

@@ -9,7 +9,7 @@ import { renderChronicleTemporalContext } from "../chronicle/state/render-chroni
 import type { ChronicleState } from "../chronicle/state/chronicle-state.js";
 import { syncChronicleStoryCard, type StoryCardRuntime } from "./story-cards/sync-chronicle-story-card.js";
 import { findChronicleStoryCardIndices } from "./story-cards/chronicle-story-card.js";
-import { readChronicleConfiguration, runtimeDateTime } from "./story-cards/chronicle-configuration.js";
+import { ensureChronicleConfigurationCard, readChronicleConfiguration, runtimeDateTime } from "./story-cards/chronicle-configuration.js";
 import { initializeChronicleState } from "../chronicle/state/initialize-chronicle-state.js";
 import { isNormalizedGregorianDateTime } from "../chronicle/calendar/normalize-gregorian-date-time.js";
 import { MAX_PROCESSED_BEAT_IDS } from "../chronicle/state/apply-temporal-decision.js";
@@ -47,6 +47,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
   return Object.freeze({
     onInput(text: string, context: AIDungeonHookContext) {
       clearChronicleNotification(context.state);
+      ensureConfigurationCardForContext(context);
       // Runs even when Chronicle is disabled this turn, so a previously
       // injected instruction is torn down promptly instead of lingering.
       syncSignalInstructionForContext(context);
@@ -56,6 +57,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       return nonEmptyText(text);
     },
     onContext(text: string, context: AIDungeonHookContext) {
+      ensureConfigurationCardForContext(context);
       syncSignalInstructionForContext(context);
       if (!enabled(context)) return nonEmptyText(text);
       const current = ensureInitialized(context);
@@ -83,6 +85,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
     },
     onOutput(text: string, context: AIDungeonHookContext) {
       clearChronicleNotification(context.state);
+      ensureConfigurationCardForContext(context);
       syncSignalInstructionForContext(context);
       // Stripped unconditionally, on every return path: a stray or rejected
       // directive (e.g. emitted from a habit formed in an earlier, enabled
@@ -197,6 +200,25 @@ function setChronicleNotification(state: Record<string, unknown>, notification: 
 
 const DUPLICATE_CARD_ERROR = "Chronicle has duplicate temporal-state cards. Set Repair Chronicle Card: true in the configuration card to repair them explicitly.";
 const UNSUPPORTED_RANGE_ERROR = "Chronicle rejected the last beat's elapsed time because it would move the story outside the supported year range (0001-9999). Canonical time was not changed.";
+const CONFIGURATION_CARD_ERROR = "Chronicle could not create or update its \"Configure Chronicle\" Story Card unexpectedly. Chronicle is paused this turn; canonical time (if any) is unaffected.";
+
+/**
+ * Auto-creates the canonical "Configure Chronicle" card on first use, and normalizes/
+ * migrates one found in a legacy shape, so the creator never has to build the card by
+ * hand (D0 Story Card integration corrective pass). Runs on every hook, before the
+ * enabled check, so a freshly created card's default `Chronicle Enabled: true` takes
+ * effect the very same turn. A failure here must never crash the turn: it is reported
+ * through the same runtime-error channel as every other Chronicle diagnostic.
+ */
+function ensureConfigurationCardForContext(context: AIDungeonHookContext): void {
+  if (context.storyCards === undefined) return;
+  try {
+    ensureChronicleConfigurationCard(context.storyCards);
+    if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === CONFIGURATION_CARD_ERROR) delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
+  } catch (error) {
+    context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `${CONFIGURATION_CARD_ERROR} (${error instanceof Error ? error.message : String(error)})`;
+  }
+}
 
 function syncProjection(context: AIDungeonHookContext, current: ChroniclePersistentRuntimeState, force: boolean): void {
   if (context.storyCards === undefined) return;

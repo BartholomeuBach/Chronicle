@@ -4,6 +4,8 @@ import { recordTemporalDecision, createTemporalLedger } from "../../../src/chron
 import type { TemporalReasonerDecision } from "../../../src/chronicle/reasoning/index.js";
 import { initializeChronicleState } from "../../../src/chronicle/state/index.js";
 import {
+  CHRONICLE_STORY_CARD_TITLE,
+  CHRONICLE_STORY_CARD_TYPE,
   createChronicleStoryCardProjection,
   findChronicleStoryCardIndex,
   findChronicleStoryCardIndices,
@@ -51,15 +53,23 @@ describe("Chronicle Story Card projection", () => {
 
     expect(projection.entry).toBe("[Chronicle]\nCurrent story time: 2026/04/13 19:47:00.\nTime of day: evening.");
     expect(projection.entry).not.toContain("walks to the inn");
+    expect(projection.title).toBe(CHRONICLE_STORY_CARD_TITLE);
+    expect(projection.type).toBe(CHRONICLE_STORY_CARD_TYPE);
     expect(JSON.parse(projection.notes)).toMatchObject({
       chronicleTemporalLedger: { schemaVersion: 1, records: [{ beatId: "output-001", confidence: "high" }] }
     });
   });
 
-  it("finds only the dedicated Chronicle card", () => {
+  it("finds only the dedicated Chronicle card, by legacy keys", () => {
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle", entry: "", type: "story" }])).toBeUndefined();
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle-temporal-state", entry: "", type: "story" }])).toBe(0);
     expect(findChronicleStoryCardIndices([{ keys: "chronicle-temporal-state", entry: "", type: "story" }, { keys: "other", entry: "", type: "story" }, { keys: "chronicle-temporal-state", entry: "", type: "story" }])).toEqual([0, 2]);
+  });
+
+  it("finds the dedicated card by its canonical title, even without the legacy keys identifier", () => {
+    expect(findChronicleStoryCardIndex([{ keys: "unrelated", entry: "", type: "class", title: "Chronicle Temporal State" }])).toBe(0);
+    expect(findChronicleStoryCardIndex([{ keys: "unrelated", entry: "", type: "class", title: "chronicle temporal state" }])).toBe(0);
+    expect(findChronicleStoryCardIndex([{ keys: "unrelated", entry: "", type: "class", title: "Something else" }])).toBeUndefined();
   });
 
   it("creates, updates, and overwrites malformed Notes from canonical data", () => {
@@ -73,6 +83,7 @@ describe("Chronicle Story Card projection", () => {
     expect(created).toMatchObject({ status: "created", cardIndex: 0, notesWriteAttempted: true });
     expect(updated).toMatchObject({ status: "updated", cardIndex: 0, notesWriteAttempted: true });
     expect(cards).toHaveLength(1);
+    expect(cards[0].title).toBe(CHRONICLE_STORY_CARD_TITLE);
     expect(() => JSON.parse(cards[0].description ?? "")).not.toThrow();
   });
 
