@@ -121,7 +121,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 ## Installation 🛠️
 
-> **Ready-to-install** means the four files below compile, pass Chronicle's full local test suite, and paste cleanly into AI Dungeon's script tabs — and CI re-checks on every change that they are exactly what building the current source produces, so they never silently go stale. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below (the fuller evidence breakdown lives in this project's internal `agent_documentation/`, which isn't part of the public repo).
+> **Ready-to-install** means these scripts are tested and kept in sync with this repository's source automatically. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below.
 
 **No cloning, no Node, no build step required.** `Input`, `Context`, and `Output` are small enough to copy directly from this page. Only `Library` — Chronicle's actual engine — is big enough to need its own file, linked below.
 
@@ -132,7 +132,8 @@ Chronicle exists so the narrator stops having to guess what time it is.
 3. Open the `DETAILS` tab, scroll down to `Scripting`, and toggle on **Scripts Enabled**.
 4. Select `EDIT SCRIPTS`.
 5. Open [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js) on GitHub, click the **copy** icon in the top-right corner of the file (or select all and copy), then select the `Library` tab on the left, delete everything in it, and paste.
-6. Select the `Input` tab, delete everything in it, and paste the code below:
+6. **Click the SAVE button now**, before touching the other tabs. Input/Context/Output all depend on something Library sets up when it runs, so save it first to be safe.
+7. Select the `Input` tab, delete everything in it, and paste the code below:
 
    <!-- chronicle:dist-embed:Input:start -->
    ```js
@@ -156,7 +157,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
    ```
    <!-- chronicle:dist-embed:Input:end -->
 
-7. Select the `Context` tab, delete everything in it, and paste the code below:
+8. Select the `Context` tab, delete everything in it, and paste the code below:
 
    <!-- chronicle:dist-embed:Context:start -->
    ```js
@@ -180,7 +181,7 @@ Chronicle exists so the narrator stops having to guess what time it is.
    ```
    <!-- chronicle:dist-embed:Context:end -->
 
-8. Select the `Output` tab, delete everything in it, and paste the code below:
+9. Select the `Output` tab, delete everything in it, and paste the code below:
 
    <!-- chronicle:dist-embed:Output:start -->
    ```js
@@ -208,10 +209,21 @@ Chronicle exists so the narrator stops having to guess what time it is.
    ```
    <!-- chronicle:dist-embed:Output:end -->
 
-9. Click the **SAVE** button.
-10. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**.
+10. Click **SAVE** again, now that all four tabs are pasted.
+11. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**. **For your very first test**, use the `Manual` initialization example further down in that section instead of the default `Automatic` — it makes what Chronicle should show you exact and predictable, with no timezone guesswork involved.
+12. **Smoke test — play one turn**, then open your Story Cards and confirm:
+    - a new card named `chronicle-temporal-state` exists;
+    - its entry matches what you set in step 11 — with the recommended Manual example, that's exactly:
+      ```
+      [Chronicle]
+      Current story time: 2026/09/16 18:00:00.
+      Time of day: evening.
+      ```
+      (or a little later, if your first action already gave Chronicle evidence that time passed).
 
-<sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle. These three snippets and `Library.js` are kept in sync with the current source automatically: CI fails the build if any of them ever stops matching a fresh build.</sub>
+    If that card never appears, see **Gameplay Tips** below and `INSTALL.md`'s troubleshooting section before assuming your own story is broken.
+
+<sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle, and these snippets are kept in sync with it automatically.</sub>
 
 ### *And that's it — Chronicle is live.*
 
@@ -257,11 +269,32 @@ AI Temporal Signal: true
 
 ⚠️ **Don't edit the Start Year/Month/Day/Hour/Minute/Second fields once your story has already started.** Chronicle intentionally never re-reads them after first use, so it won't silently reset an active timeline.
 
+**For your first-ever test, use `Manual` instead of `Automatic`, with fixed values:**
+
+```
+Chronicle Enabled: true
+Initialization Mode: Manual
+Start Year: 2026
+Start Month: 9
+Start Day: 16
+Start Hour: 18
+Start Minute: 0
+Start Second: 0
+Repair Chronicle Card: false
+AI Temporal Signal: true
+```
+
+This gives you an exact, predictable expected value for the smoke test above — `2026/09/16 18:00:00`
+— instead of "whatever time it is right now," which also rules out any `Automatic`/timezone
+question (`Intl.DateTimeFormat` behavior in the AI Dungeon sandbox is one of the things this first
+test is meant to help confirm) as a confound while you're checking whether Chronicle itself works.
+`Automatic` is the normal, recommended mode for everyday play once you've confirmed installation.
+
 ---
 
 ### Gameplay Tips
 
-- The `Library` tab must be pasted and saved before `Input`/`Context`/`Output` do anything meaningful — Chronicle assumes AI Dungeon evaluates `Library` first. If nothing seems to be happening, this is the first thing to check.
+- `Library` should be saved before `Input`/`Context`/`Output` are ever exercised (step 6 above) — Chronicle assumes AI Dungeon evaluates `Library` first. If the smoke test's `chronicle-temporal-state` card never appears, this is the first thing to check.
 - No `chronicle-configuration` card means Chronicle is simply off — that's the intended behavior, not a bug.
 - Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `chronicle-temporal-state` Story Card's Notes, for players who want to inspect how the clock got there.
 - Chronicle is early (see **Project Status** below) — not every narrative edge case is handled yet.
@@ -311,16 +344,25 @@ may advance the story by several days even if that exact action was never predef
 Chronicle uses a hierarchy of evidence:
 
 ```text
-Explicit temporal information
+0. Validated AI temporal signal (guarded, optional)
         ↓
-Narrative semantics
+1. Explicit temporal evidence
         ↓
-Contextual reasoning
+2. Narrative semantics / contextual rules
         ↓
-Activity priors
+3. Activity priors
         ↓
-Conservative fallback
+4. Conservative fallback
 ```
+
+**The AI narrator's own signal sits at the top, but it is never trusted blindly.** When enabled (the
+default), Chronicle asks the AI Dungeon narrator to report how much time it judges just passed,
+tagged with its own confidence. That report is checked against the same non-current-frame guard
+Chronicle's deterministic rules already use — a memory, dream, hypothetical, or quoted scene — and
+is trusted only if it doesn't contradict that check. Absent, malformed, or contradicted signals fall
+straight through to tier 1 and below, exactly as if the narrator had said nothing at all. Tiers 1-4
+are Chronicle's original deterministic rules, unchanged and always active as the fallback — they are
+what runs every single time tier 0 has nothing to say.
 
 Narrative evidence always wins over rigid defaults.
 

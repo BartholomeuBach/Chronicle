@@ -55,8 +55,11 @@ repo) for how these compose into `npm run check`.</sub>
 
 ## 2. Paste the scripts, Library first
 
+The operational rule is simple: **paste and save Library first, then paste Input/Context/Output,
+then save again.**
+
 1. Open your Scenario's **Details -> Scripting**. Paste `Library.js` (from section 1 above) into
-   the **Library** tab and save.
+   the **Library** tab, then **save now**, before touching the other three tabs.
 2. Select the `Input` tab, delete everything in it, and paste this:
 
    <!-- chronicle:dist-embed:Input:start -->
@@ -133,7 +136,7 @@ repo) for how these compose into `npm run check`.</sub>
    ```
    <!-- chronicle:dist-embed:Output:end -->
 
-5. Save.
+5. **Save again**, now that all four tabs are pasted.
 
 **Library must be saved before the other three are exercised.** Chronicle's Input/Context/Output
 scripts call a single shared function that Library sets up when it runs; the assumption is that AI
@@ -194,9 +197,50 @@ Field reference:
 **Do not edit the initialization fields once the story has started.** Chronicle intentionally never
 re-reads them after first use, to avoid silently resetting an active timeline.
 
-## 4. Play a turn and check what you should see
+**For your first-ever test, use `Manual` with fixed values instead of `Automatic`:**
 
-- **Locally validated:** on the first enabled turn, Chronicle creates a second Story Card
+```
+Chronicle Enabled: true
+Initialization Mode: Manual
+Start Year: 2026
+Start Month: 9
+Start Day: 16
+Start Hour: 18
+Start Minute: 0
+Start Second: 0
+Repair Chronicle Card: false
+AI Temporal Signal: true
+```
+
+This gives the smoke test below (section 4) an exact, predictable expected value —
+`2026/09/16 18:00:00` — instead of "whatever the current time happens to be," and rules out
+`Automatic`'s `Intl.DateTimeFormat`/timezone dependency (itself one of the things this first test is
+meant to help confirm, not something you want as a confound while checking Chronicle itself).
+`Automatic` is the normal, recommended mode for everyday play once installation is confirmed
+working — switch back to it (or start a fresh Scenario/config card; see the warning above about not
+editing an active story's initialization fields) whenever you like after this first test.
+
+## 4. Smoke test: play one turn and confirm Chronicle initialized
+
+This is the one check every install should run before anything else — it tells you, in under a
+minute, whether Chronicle is actually active or only appears to be installed.
+
+1. Play (or Continue) one turn in your Scenario.
+2. Open your Story Cards and look for a card named **`chronicle-temporal-state`**.
+3. Its entry should read:
+   ```
+   [Chronicle]
+   Current story time: 2026/09/16 18:00:00.
+   Time of day: evening.
+   ```
+   (using the recommended Manual example from section 3 above) — or a little later than that, if
+   your first action already gave Chronicle evidence that some time passed during it.
+
+**If that card never appears:** see "5. If something looks wrong" below — most likely cause is the
+`chronicle-configuration` card being missing/misspelled, or Library not having been saved before the
+other tabs (section 2).
+
+- **Locally validated:** on the first enabled turn, Chronicle creates that second Story Card
   (`chronicle-temporal-state`) showing only the current in-story date/time — no Ledger history, no
   confidence scores, nothing else. The model's context gains a compact three-line `[Chronicle]`
   block with the same current time. Both are proven by automated tests
