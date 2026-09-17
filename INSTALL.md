@@ -4,6 +4,9 @@
 > its "Installation" section. This document is the fuller, evidence-labeled version referenced by
 > `agent_documentation/PROJECT_PLANNING.md` (Phase 7) — the two should never disagree; if they ever
 > drift, treat this one as authoritative for the locally-validated/requires-in-app-validation split.
+> Every `agent_documentation/...` path mentioned below is this project's internal, maintainer-facing
+> documentation — deliberately not part of the public repository, so those paths aren't clickable
+> links here and won't resolve if you go looking for them on GitHub.
 
 This is the Phase 7 "ready-to-install" package instructions: how to paste Chronicle into a
 supported AI Dungeon Scenario. It assumes no source-code knowledge, but it does assume you can
@@ -17,26 +20,38 @@ below). Every claim in this document is either **locally validated** (proven by 
 you can re-run yourself) or **requires in-app validation** (an assumption about how AI Dungeon's
 runtime behaves, not yet observed). Where that distinction matters, it is called out explicitly.
 
-## 1. Get the four script files
+## 1. Get the four script files — no clone, no Node, no build
 
-From a checkout of this repository:
+The four files this package needs are already committed to this repository, ready to copy
+straight from GitHub. **You do not need to clone this repository, install Node/npm, or run any
+build command to install Chronicle.**
 
-```
-npm install
-npm run build
-```
+| File | AI Dungeon tab | GitHub link |
+|---|---|---|
+| `Library.js` | **Library** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js> |
+| `Input.js` | **Input** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js> |
+| `Context.js` | **Context** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js> |
+| `Output.js` | **Output** | <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js> |
 
-This produces four files in `dist/aidungeon/`:
-
-| File | AI Dungeon tab |
-|---|---|
-| `Library.js` | **Library** |
-| `Input.js` | **Input** |
-| `Context.js` | **Context** |
-| `Output.js` | **Output** |
+For each one: open the link, click the **copy** icon in the file view's top-right corner (or
+select all and copy), then paste the full contents into the matching AI Dungeon tab.
 
 Each file is self-contained (no `import`/`require`, verified by `npm run verify:dist`) and is
 meant to be pasted whole into its matching tab, replacing that tab's contents.
+
+**Locally validated, not a claim about GitHub:** a CI check (`npm run verify:dist:fresh`, part of
+`npm run check`, wired into `.github/workflows/check.yml`) fails the build whenever these four
+files stop matching a fresh build of the current TypeScript source. That means whatever is at the
+links above, on the `main` branch, is guaranteed in sync with this repository's own source — it
+does not mean GitHub itself is guaranteed available or unaltered; that trust is the same as for any
+GitHub-hosted file.
+
+<sub>Building from source (`npm install && npm run build`) exists only for developers modifying
+Chronicle's TypeScript. It regenerates these same four files in place; it has never been required
+to install Chronicle. `npm run verify:dist` checks the build's structural validity (self-contained,
+`modifier(text)` present); `npm run verify:dist:fresh` separately checks the build matches what's
+committed — see `06_testing_strategy.md` in this project's internal `agent_documentation/` (not
+part of the public repo) for how these compose into `npm run check`.</sub>
 
 ## 2. Paste the scripts, Library first
 

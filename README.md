@@ -121,26 +121,29 @@ Chronicle exists so the narrator stops having to guess what time it is.
 
 ## Installation 🛠️
 
-> **Ready-to-install** means the four files below compile, pass Chronicle's full local test suite, and paste cleanly into AI Dungeon's script tabs. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below and [`agent_documentation/`](./agent_documentation) for the honest breakdown of what's proven versus what's still assumed.
+> **Ready-to-install** means the four files below compile, pass Chronicle's full local test suite, and paste cleanly into AI Dungeon's script tabs — and CI re-checks on every change that they are exactly what building the current source produces, so they never silently go stale. It does **not** mean any of this has been confirmed working inside a real AI Dungeon Scenario yet — that's a separate, still-pending validation pass. See **Project Status** below (the fuller evidence breakdown lives in this project's internal `agent_documentation/`, which isn't part of the public repo).
+
+**No cloning, no Node, no build step required.** The four files you need already live in this repository, ready to copy straight from GitHub:
+
+- [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js)
+- [`Input.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js)
+- [`Context.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js)
+- [`Output.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js)
 
 ### Scenario Script Install Guide
 
-1. Clone or download this repository, then install dependencies and build the four AI Dungeon script files:
-   ```bash
-   npm install
-   npm run build
-   ```
-   This produces `dist/aidungeon/Library.js`, `Input.js`, `Context.js`, and `Output.js` — one self-contained file per AI Dungeon script tab, ready to paste as-is.
-2. Open the [AI Dungeon website](https://aidungeon.com/) on PC (or "View as Desktop" if you're on mobile-only).
-3. [Create a new Scenario](https://help.aidungeon.com/faq/what-are-scenarios), or open an existing one you want to add Chronicle to.
-4. Open the `DETAILS` tab, scroll down to `Scripting`, and toggle on **Scripts Enabled**.
-5. Select `EDIT SCRIPTS`.
-6. Select the `Library` tab on the left, delete everything in it, and paste in the full contents of `dist/aidungeon/Library.js`.
-7. Select the `Input` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Input.js`.
-8. Select the `Context` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Context.js`.
-9. Select the `Output` tab, delete everything in it, and paste in the full contents of `dist/aidungeon/Output.js`.
-10. Click the **SAVE** button.
-11. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**.
+1. Open the [AI Dungeon website](https://aidungeon.com/) on PC (or "View as Desktop" if you're on mobile-only).
+2. [Create a new Scenario](https://help.aidungeon.com/faq/what-are-scenarios), or open an existing one you want to add Chronicle to.
+3. Open the `DETAILS` tab, scroll down to `Scripting`, and toggle on **Scripts Enabled**.
+4. Select `EDIT SCRIPTS`.
+5. Open [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js) on GitHub, click the **copy** icon in the top-right corner of the file (or select all and copy), then select the `Library` tab on the left, delete everything in it, and paste.
+6. Repeat step 5 for [`Input.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js) → the `Input` tab.
+7. Repeat step 5 for [`Context.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js) → the `Context` tab.
+8. Repeat step 5 for [`Output.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js) → the `Output` tab.
+9. Click the **SAVE** button.
+10. Create a new Story Card with **Keys** set to `chronicle-configuration`, and paste the [configuration template](#configuration-card) below into its **Notes**.
+
+<sub>Building from source (`npm install && npm run build`) is only for developers who want to modify Chronicle's TypeScript — see **Architecture Philosophy** below. It has never been required to install Chronicle.</sub>
 
 ### *And that's it — Chronicle is live.*
 
@@ -193,7 +196,7 @@ AI Temporal Signal: true
 - The `Library` tab must be pasted and saved before `Input`/`Context`/`Output` do anything meaningful — Chronicle assumes AI Dungeon evaluates `Library` first. If nothing seems to be happening, this is the first thing to check.
 - No `chronicle-configuration` card means Chronicle is simply off — that's the intended behavior, not a bug.
 - Chronicle only ever shows the AI the *current* time, never a history dump — the full reasoning log lives in a separate `chronicle-temporal-state` Story Card's Notes, for players who want to inspect how the clock got there.
-- Chronicle is early (see **Project Status** below) — check [`agent_documentation/05_known_limitations.md`](./agent_documentation/05_known_limitations.md) before assuming every narrative edge case is handled.
+- Chronicle is early (see **Project Status** below) — not every narrative edge case is handled yet.
 
 ---
 

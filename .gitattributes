@@ -1,0 +1,12 @@
+# AI Dungeon distributable artifacts (dist/aidungeon/*.js) are committed to
+# the repo so installers can copy/paste them without cloning or building
+# (see INSTALL.md). They must stay byte-identical to what `npm run build`
+# produces regardless of the committer's or CI runner's OS, or the
+# `verify:dist:fresh` freshness check (npm run check) would false-positive
+# on a pure line-ending difference instead of a real content drift. `-text`
+# disables Git's line-ending conversion and diff normalization for these
+# paths entirely; esbuild always writes LF, so this pins that.
+dist/aidungeon/Library.js -text
+dist/aidungeon/Input.js -text
+dist/aidungeon/Context.js -text
+dist/aidungeon/Output.js -text

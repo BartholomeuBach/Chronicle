@@ -146,3 +146,19 @@ vite.config.ts.timestamp-*
 AGENTS.md
 CLAUDE.md
 agent_documentation/
+
+# AI Dungeon distributable artifacts are deliberately committed, as an
+# exception to the generic "dist" ignore rule above: installers must be able
+# to copy/paste them straight from GitHub with no Node/npm/clone required
+# (see INSTALL.md). `npm run build` still regenerates these in place as a
+# developer tool; CI's `verify:dist:fresh` step fails the build if a commit's
+# source and its committed artifacts ever disagree, so this exception cannot
+# silently go stale. Any other future build output under dist/ stays ignored.
+!/dist/
+/dist/*
+!/dist/aidungeon/
+/dist/aidungeon/*
+!/dist/aidungeon/Library.js
+!/dist/aidungeon/Input.js
+!/dist/aidungeon/Context.js
+!/dist/aidungeon/Output.js
