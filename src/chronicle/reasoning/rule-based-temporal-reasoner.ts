@@ -22,12 +22,21 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
   if (/(mais tarde|later|depois de um tempo|after a while)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 5, seconds: 0 }), "conservative-fallback", "Narrative gives a vague later-time expression.", "low");
   }
+  if (isClockOrScreenObservation(narrative)) {
+    return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), "conservative-fallback", "A clock or screen observation establishes current time but no elapsed duration.", "low");
+  }
   const prior = input.activityPriors.find((candidate) => candidate.requiresContext !== true && matchesActivity(narrative, candidate.activity));
   if (prior !== undefined) return decision(prior.suggestedElapsedTime, "scene-progression", "Activity prior used only because stronger temporal evidence is absent.", "low");
   if (/\b(?:correu|walked|ran|atravessando|travelling|traveled)\b/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 1, seconds: 0 }), "scene-progression", "Completed narrative shows a continuing physical scene, not completed travel.", "low");
   }
   return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), "conservative-fallback", "No defensible elapsed-time evidence in the completed narrative.", "low");
+}
+
+/** A glance at a display is an observation, not a completed time-consuming activity. */
+function isClockOrScreenObservation(text: string): boolean {
+  return /\b(?:glances?|looks?|checks?|reads?|inspects?|watches?|studies?)\b/.test(text) &&
+    /\b(?:clock|time|watch|screen|display|monitor|phone|laptop|calendar|date)\b/.test(text);
 }
 
 /**

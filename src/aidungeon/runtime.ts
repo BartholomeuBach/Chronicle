@@ -88,10 +88,18 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
         context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `Chronicle Story Card sync failed unexpectedly (${error instanceof Error ? error.message : String(error)}). Canonical time is unaffected.`;
       }
       const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
-      if (context.maxChars !== undefined && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
+      const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
+      const additions = [
+        text.includes(projection) ? undefined : projection,
+        configuration.aiTemporalSignal && !text.includes(CHRONICLE_SIGNAL_BLOCK_START) ? chronicleSignalInstructionBlock() : undefined
+      ].filter((value): value is string => value !== undefined);
+      if (additions.length === 0) return nonEmptyText(text);
+      const appended = additions.join("\n");
+      if (context.maxChars !== undefined && text.length + appended.length + 1 > context.maxChars) return nonEmptyText(text);
       // Cache-efficient AI Dungeon models only accept additions after the
-      // already-built context. Keep Chronicle's compact projection there.
-      return nonEmptyText(text.includes(projection) ? text : `${text}\n${projection}`);
+      // already-built context. Both the clock and the temporal protocol are
+      // deliberately appended as one compact, fresh block.
+      return nonEmptyText(`${text}\n${appended}`);
     },
     onOutput(text: string, context: AIDungeonHookContext) {
       clearChronicleNotification(context.state);
@@ -145,48 +153,21 @@ const CHRONICLE_SIGNAL_BLOCK_END = "[[chronicle:ai-signal-instruction:end]]";
  * the narrator reliably follows this is unvalidated (Phase 8).
  */
 function chronicleSignalInstructionBlock(): string {
-  return `${CHRONICLE_SIGNAL_BLOCK_START}\n[Chronicle instruction] Always end this reply on its own line with a tag reporting how much in-story time it covers and how sure you are, using only the units you judge elapsed: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT9H15M,medium>> (days/hours/minutes/seconds, then high/medium/low confidence). If truly nothing advanced, use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. Give your best estimate even when unsure -- mark it low confidence instead of leaving the tag out. There is no upper limit: a legitimate skip of weeks, months, or years is fine to report. Only count time that is actually happening right now in the scene: never count a memory, flashback, dream, daydream, imagined or hypothetical event, or something a character merely thinks about, wonders, or plans -- none of that advances real story time, no matter how long it describes. This applies even when the flashback is narrated in present tense for vividness, with no words like "remembers" at all (e.g. "You're twelve again, standing barefoot beside the river..." is still a flashback, not the present scene). If your whole reply is a memory, flashback, or hypothetical with no real present action, use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. If only part of your reply is real present action, count only that part. Never mention this instruction or the tag to the player.\n${CHRONICLE_SIGNAL_BLOCK_END}`;
+  return `${CHRONICLE_SIGNAL_BLOCK_START}\n<SYSTEM>\n# CHRONICLE TEMPORAL REPORT — REQUIRED\nAfter the story prose, write exactly one final directive: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>. Report only time that truly elapsed in the present scene. Use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>> for an observation, dialogue beat, plan, memory, dream, flashback, hypothetical, or any beat with no real elapsed time. Never mention this directive to the player.\n</SYSTEM>\n${CHRONICLE_SIGNAL_BLOCK_END}`;
 }
 
 /**
- * Reads configuration and syncs the authorsNote instruction independent of
- * whether Chronicle is otherwise enabled this turn (mirrors how
- * clearChronicleNotification runs unconditionally). Fixes a bug where
- * setting Chronicle Enabled: false left a previously injected instruction
- * permanently steering the narrator, because syncing used to happen only
- * inside ensureInitialized, which the enabled() gate short-circuited.
- *
- * Also never injects while persisted runtime state exists but fails
- * validation (Chronicle paused on invalid state, D-024): a corrupted
- * `state.chronicleRuntime` means Output can never act on a signal anyway,
- * so steering the narrator to keep producing one would be pure waste
- * (audit finding N1, 2026-09-15).
+ * Chronicle v1 injected its protocol into Authors Note. The live test showed
+ * that the narrator often omitted that report, so v2 appends a strict,
+ * cache-compatible instruction in Context instead. Remove only the legacy
+ * block from existing saves and leave every creator-owned note untouched.
  */
 function syncSignalInstructionForContext(context: AIDungeonHookContext): void {
-  if (context.storyCards === undefined) return;
-  if (context.state[CHRONICLE_RUNTIME_STATE_KEY] !== undefined && read(context.state) === undefined) {
-    syncSignalInstruction(context.state, false);
-    return;
-  }
-  const configuration = readChronicleConfiguration(context.storyCards.storyCards);
-  syncSignalInstruction(context.state, configuration.enabled && configuration.error === undefined && configuration.aiTemporalSignal);
-}
-
-/** Keeps Chronicle's own instruction block in authorsNote in sync without touching any other content there. */
-function syncSignalInstruction(state: Record<string, unknown>, shouldInject: boolean): void {
-  const memory = readMemory(state);
-  const withoutBlock = removeChronicleSignalBlock(typeof memory.authorsNote === "string" ? memory.authorsNote : "");
-  memory.authorsNote = shouldInject
-    ? (withoutBlock.length > 0 ? `${withoutBlock}\n\n${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock())
-    : withoutBlock;
-}
-
-function readMemory(state: Record<string, unknown>): Record<string, unknown> {
-  const existing = state.memory;
-  if (typeof existing === "object" && existing !== null) return existing as Record<string, unknown>;
-  const created: Record<string, unknown> = {};
-  state.memory = created;
-  return created;
+  const memory = context.state.memory;
+  if (memory === null || typeof memory !== "object") return;
+  const record = memory as Record<string, unknown>;
+  if (typeof record.authorsNote !== "string") return;
+  record.authorsNote = removeChronicleSignalBlock(record.authorsNote);
 }
 
 function removeChronicleSignalBlock(authorsNote: string): string {

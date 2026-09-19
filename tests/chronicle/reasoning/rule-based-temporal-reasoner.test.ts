@@ -45,6 +45,14 @@ describe("ruleBasedTemporalReasoner", () => {
     expect(decide("He reads a 2 hours old letter.")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
   });
 
+  it("does not advance time for a clock or screen observation merely because an activity prior matches", () => {
+    const prior = createActivityPrior({ activity: "read", suggestedElapsedTime: { days: 0, hours: 0, minutes: 15, seconds: 0 } });
+    expect(decide("You glance at the clock in the corner of your laptop screen and read the current time.", undefined, [prior])).toMatchObject({
+      elapsedTime: { days: 0, hours: 0, minutes: 0, seconds: 0 },
+      mode: "conservative-fallback"
+    });
+  });
+
   it("does not invent a full duration for ambiguous travel or combat", () => {
     expect(decide("They begin their journey through the mountains.", "I travel north")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
     expect(decide("The battle rages on.", "I attack")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });

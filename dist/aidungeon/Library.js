@@ -56,12 +56,18 @@
     if (/(mais tarde|later|depois de um tempo|after a while)/.test(narrative)) {
       return decision(createElapsedTime({ days: 0, hours: 0, minutes: 5, seconds: 0 }), "conservative-fallback", "Narrative gives a vague later-time expression.", "low");
     }
+    if (isClockOrScreenObservation(narrative)) {
+      return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), "conservative-fallback", "A clock or screen observation establishes current time but no elapsed duration.", "low");
+    }
     const prior = input.activityPriors.find((candidate) => candidate.requiresContext !== true && matchesActivity(narrative, candidate.activity));
     if (prior !== void 0) return decision(prior.suggestedElapsedTime, "scene-progression", "Activity prior used only because stronger temporal evidence is absent.", "low");
     if (/\b(?:correu|walked|ran|atravessando|travelling|traveled)\b/.test(narrative)) {
       return decision(createElapsedTime({ days: 0, hours: 0, minutes: 1, seconds: 0 }), "scene-progression", "Completed narrative shows a continuing physical scene, not completed travel.", "low");
     }
     return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }), "conservative-fallback", "No defensible elapsed-time evidence in the completed narrative.", "low");
+  }
+  function isClockOrScreenObservation(text) {
+    return /\b(?:glances?|looks?|checks?|reads?|inspects?|watches?|studies?)\b/.test(text) && /\b(?:clock|time|watch|screen|display|monitor|phone|laptop|calendar|date)\b/.test(text);
   }
   var HAD_INTERVENING_ADVERBS = "already|never|just|finally|once|recently|previously|always|barely|hardly|long";
   var HAD_IRREGULAR_PARTICIPLES = "been|gone|done|seen|known|come|left|taken|given|found|told|said|held|felt|thought|brought|caught|taught|fought|sought|written|spoken|broken|chosen|stolen|frozen|grown|blown|drawn|worn|torn|born|spent|built|sent|meant|kept|slept|swept|dealt|lost|made|met|paid|read|run|shown|stood|won|begun|risen|fallen|forgotten|hidden|ridden|sworn";
@@ -1034,6 +1040,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
         return nonEmptyText(text);
       },
       onContext(text, context) {
+        var _a, _b;
         ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         if (!enabled(context)) return nonEmptyText(text);
@@ -1045,9 +1052,16 @@ Story time: ${formatChronicleDateTime(next)}.`;
           context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `Chronicle Story Card sync failed unexpectedly (${error instanceof Error ? error.message : String(error)}). Canonical time is unaffected.`;
         }
         const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
-        if (context.maxChars !== void 0 && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
-        return nonEmptyText(text.includes(projection) ? text : `${text}
-${projection}`);
+        const configuration = readChronicleConfiguration((_b = (_a = context.storyCards) == null ? void 0 : _a.storyCards) != null ? _b : []);
+        const additions = [
+          text.includes(projection) ? void 0 : projection,
+          configuration.aiTemporalSignal && !text.includes(CHRONICLE_SIGNAL_BLOCK_START) ? chronicleSignalInstructionBlock() : void 0
+        ].filter((value) => value !== void 0);
+        if (additions.length === 0) return nonEmptyText(text);
+        const appended = additions.join("\n");
+        if (context.maxChars !== void 0 && text.length + appended.length + 1 > context.maxChars) return nonEmptyText(text);
+        return nonEmptyText(`${text}
+${appended}`);
       },
       onOutput(text, context) {
         var _a, _b, _c;
@@ -1083,31 +1097,18 @@ ${projection}`);
   var CHRONICLE_SIGNAL_BLOCK_END = "[[chronicle:ai-signal-instruction:end]]";
   function chronicleSignalInstructionBlock() {
     return `${CHRONICLE_SIGNAL_BLOCK_START}
-[Chronicle instruction] Always end this reply on its own line with a tag reporting how much in-story time it covers and how sure you are, using only the units you judge elapsed: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT9H15M,medium>> (days/hours/minutes/seconds, then high/medium/low confidence). If truly nothing advanced, use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. Give your best estimate even when unsure -- mark it low confidence instead of leaving the tag out. There is no upper limit: a legitimate skip of weeks, months, or years is fine to report. Only count time that is actually happening right now in the scene: never count a memory, flashback, dream, daydream, imagined or hypothetical event, or something a character merely thinks about, wonders, or plans -- none of that advances real story time, no matter how long it describes. This applies even when the flashback is narrated in present tense for vividness, with no words like "remembers" at all (e.g. "You're twelve again, standing barefoot beside the river..." is still a flashback, not the present scene). If your whole reply is a memory, flashback, or hypothetical with no real present action, use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. If only part of your reply is real present action, count only that part. Never mention this instruction or the tag to the player.
+<SYSTEM>
+# CHRONICLE TEMPORAL REPORT \u2014 REQUIRED
+After the story prose, write exactly one final directive: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>. Report only time that truly elapsed in the present scene. Use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>> for an observation, dialogue beat, plan, memory, dream, flashback, hypothetical, or any beat with no real elapsed time. Never mention this directive to the player.
+</SYSTEM>
 ${CHRONICLE_SIGNAL_BLOCK_END}`;
   }
   function syncSignalInstructionForContext(context) {
-    if (context.storyCards === void 0) return;
-    if (context.state[CHRONICLE_RUNTIME_STATE_KEY] !== void 0 && read(context.state) === void 0) {
-      syncSignalInstruction(context.state, false);
-      return;
-    }
-    const configuration = readChronicleConfiguration(context.storyCards.storyCards);
-    syncSignalInstruction(context.state, configuration.enabled && configuration.error === void 0 && configuration.aiTemporalSignal);
-  }
-  function syncSignalInstruction(state, shouldInject) {
-    const memory = readMemory(state);
-    const withoutBlock = removeChronicleSignalBlock(typeof memory.authorsNote === "string" ? memory.authorsNote : "");
-    memory.authorsNote = shouldInject ? withoutBlock.length > 0 ? `${withoutBlock}
-
-${chronicleSignalInstructionBlock()}` : chronicleSignalInstructionBlock() : withoutBlock;
-  }
-  function readMemory(state) {
-    const existing = state.memory;
-    if (typeof existing === "object" && existing !== null) return existing;
-    const created = {};
-    state.memory = created;
-    return created;
+    const memory = context.state.memory;
+    if (memory === null || typeof memory !== "object") return;
+    const record = memory;
+    if (typeof record.authorsNote !== "string") return;
+    record.authorsNote = removeChronicleSignalBlock(record.authorsNote);
   }
   function removeChronicleSignalBlock(authorsNote) {
     const pattern = new RegExp(`\\n*${escapeForRegExp(CHRONICLE_SIGNAL_BLOCK_START)}[\\s\\S]*?${escapeForRegExp(CHRONICLE_SIGNAL_BLOCK_END)}`, "g");

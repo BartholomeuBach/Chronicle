@@ -28,7 +28,10 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
       updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
     };
     expect(runtime.onInput("I walk.", { state, storyCards })).toBe("I walk.");
-    expect(runtime.onContext("Base context.", { state, storyCards })).toBe("Base context.\n[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening.");
+    const contextualized = runtime.onContext("Base context.", { state, storyCards });
+    expect(contextualized).toContain("Base context.\n[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening.");
+    expect(contextualized).toContain("# CHRONICLE TEMPORAL REPORT — REQUIRED");
+    expect(contextualized).toContain("<<chronicle:PT#D#H#M#S,high|medium|low>>");
     expect(JSON.stringify(state)).toContain("I walk.");
   });
 
@@ -70,7 +73,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
       addStoryCard: () => false,
       updateStoryCard: () => { throw new Error("simulated platform failure"); }
     };
-    expect(createChronicleRuntime().onContext("Base context.", { state, storyCards })).toBe(
+    expect(createChronicleRuntime().onContext("Base context.", { state, storyCards })).toContain(
       "Base context.\n[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening."
     );
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("Story Card sync failed unexpectedly");
@@ -421,41 +424,34 @@ describe("AI Temporal Signal (D-026)", () => {
   const manualNotes = (extra = "") =>
     `Chronicle Enabled: true\nInitialization Mode: Manual\nStart Year: 2026\nStart Month: 4\nStart Day: 13\nStart Hour: 19\nStart Minute: 32\nStart Second: 0${extra}`;
 
-  it("injects its instruction into authorsNote by default, without touching a creator's own note", () => {
+  it("appends its strict temporal protocol in Context without touching a creator's Authors Note", () => {
     const state: Record<string, unknown> = { memory: { authorsNote: "Keep tone dark and gritty." } };
     const { storyCards } = cardsFor(manualNotes());
-    createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
+    const contextualized = createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
     const authorsNote = (state.memory as { authorsNote: string }).authorsNote;
-    expect(authorsNote).toContain("Keep tone dark and gritty.");
-    expect(authorsNote).toContain("<<chronicle:");
+    expect(authorsNote).toBe("Keep tone dark and gritty.");
+    expect(contextualized).toContain("# CHRONICLE TEMPORAL REPORT — REQUIRED");
   });
 
-  it("instructs the narrator to self-guard against memories, flashbacks, and hypotheticals, including in a mixed reply (2026-09-16)", () => {
+  it("instructs the narrator to self-guard against memories, flashbacks, and hypotheticals", () => {
     const state: Record<string, unknown> = {};
     const { storyCards } = cardsFor(manualNotes());
-    createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
-    const authorsNote = (state.memory as { authorsNote: string }).authorsNote;
-    expect(authorsNote).toContain("Only count time that is actually happening right now in the scene");
-    expect(authorsNote).toContain("memory, flashback, dream, daydream, imagined or hypothetical event");
-    expect(authorsNote).toContain("If only part of your reply is real present action, count only that part");
-    expect(authorsNote).toContain("even when the flashback is narrated in present tense");
+    const contextualized = createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
+    expect(contextualized).toContain("memory, dream, flashback, hypothetical");
+    expect(contextualized).toContain("no real elapsed time");
   });
 
-  it("never injects the instruction when AI Temporal Signal is disabled", () => {
+  it("does not append the temporal protocol when AI Temporal Signal is disabled", () => {
     const state: Record<string, unknown> = {};
     const { storyCards } = cardsFor(manualNotes("\nAI Temporal Signal: false"));
-    createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
-    expect((state.memory as { authorsNote?: string } | undefined)?.authorsNote ?? "").not.toContain("<<chronicle:");
+    const contextualized = createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
+    expect(contextualized).not.toContain("# CHRONICLE TEMPORAL REPORT — REQUIRED");
   });
 
-  it("removes its own instruction, and only its own, once the story pauses on invalid configuration", () => {
-    const state: Record<string, unknown> = { memory: { authorsNote: "Creator note." } };
+  it("removes only its legacy Authors Note instruction from existing saves", () => {
+    const state: Record<string, unknown> = { memory: { authorsNote: "Creator note.\n[[chronicle:ai-signal-instruction:start]]\nlegacy\n[[chronicle:ai-signal-instruction:end]]" } };
     const { storyCards: enabledCards } = cardsFor(manualNotes());
     createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards: enabledCards });
-    expect((state.memory as { authorsNote: string }).authorsNote).toContain("<<chronicle:");
-
-    const { storyCards: brokenCards } = cardsFor("Chronicle Enabled: true\nInitialization Mode: Manual\nStart Year: long ago");
-    createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards: brokenCards });
     const authorsNote = (state.memory as { authorsNote: string }).authorsNote;
     expect(authorsNote).toBe("Creator note.");
   });
@@ -508,16 +504,16 @@ describe("AI Temporal Signal (D-026)", () => {
     expect(result).toBe("Something happens.");
   });
 
-  it("removes its own instruction from authorsNote once Chronicle Enabled is set to false (regression: it used to linger)", () => {
-    const state: Record<string, unknown> = {};
+  it("does not leave the temporal protocol in Authors Note once Chronicle is disabled", () => {
+    const state: Record<string, unknown> = { memory: { authorsNote: "Creator note.\n[[chronicle:ai-signal-instruction:start]]\nlegacy\n[[chronicle:ai-signal-instruction:end]]" } };
     const { storyCards: enabledStoryCards } = cardsFor(manualNotes());
     const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
     runtime.onContext("Base context.", { state, storyCards: enabledStoryCards });
-    expect((state.memory as { authorsNote: string }).authorsNote).toContain("<<chronicle:");
+    expect((state.memory as { authorsNote: string }).authorsNote).toBe("Creator note.");
 
     const { storyCards: disabledStoryCards } = cardsFor("Chronicle Enabled: false");
-    runtime.onContext("Base context.", { state, storyCards: disabledStoryCards });
-    expect((state.memory as { authorsNote: string }).authorsNote).not.toContain("<<chronicle:");
+    const contextualized = runtime.onContext("Base context.", { state, storyCards: disabledStoryCards });
+    expect(contextualized).not.toContain("# CHRONICLE TEMPORAL REPORT — REQUIRED");
   });
 
   it("still stops advancing time once Chronicle is disabled, even with persisted state already present", () => {

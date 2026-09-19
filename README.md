@@ -476,6 +476,8 @@ Together, they should help transform AI-driven stories from loosely remembered t
 
 Chronicle is currently in early development.
 
+Live AI Dungeon validation has begun: script loading, Story Card creation, Notes projection, persistence, model-visible clock context, and ledger writes have been observed in a real Scenario. Temporal-inference quality and the optional narrator signal are not yet validated; see [VALIDATION.md](./VALIDATION.md) for the current evidence and test backlog.
+
 Expect:
 
 * experiments;
