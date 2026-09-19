@@ -1,435 +1,136 @@
-# Installing Chronicle in AI Dungeon
+# Chronicle — installation guide
 
-> The friendly, quick-start version of this guide now also lives in [`README.md`](./README.md), under
-> its "Installation" section. This document is the fuller, evidence-labeled version referenced by
-> `agent_documentation/PROJECT_PLANNING.md` (Phase 7) — the two should never disagree; if they ever
-> drift, treat this one as authoritative for the locally-validated/requires-in-app-validation split.
-> Every `agent_documentation/...` path mentioned below is this project's internal, maintainer-facing
-> documentation — deliberately not part of the public repository, so those paths aren't clickable
-> links here and won't resolve if you go looking for them on GitHub.
+This is the detailed, authoritative guide for installing Chronicle in an AI Dungeon Scenario. It deliberately links only to the four committed artifacts in `dist/aidungeon/`: installers never need to clone the repository, run Node, build TypeScript, or copy JavaScript out of a rendered Markdown block.
 
-This is the Phase 7 "ready-to-install" package instructions: how to paste Chronicle into a
-supported AI Dungeon Scenario. It assumes no source-code knowledge, but it does assume you can
-open a Scenario's **Details -> Scripting** tabs and create a Story Card.
+> **Ready to install is not validated in AI Dungeon.** Local tests prove that the published files are generated, self-contained, fresh, and parseable. Their lifecycle, Story Card, and narrator behavior still require the Phase 8 test run in a real Scenario.
 
-**What "ready-to-install" means here, precisely:** the four scripts below compile, pass Chronicle's
-full local test suite, and produce self-contained artifacts with no unresolved imports (verified by
-`npm run check`, see `agent_documentation/06_testing_strategy.md`). It does **not** mean any of this
-has been confirmed to work inside a real AI Dungeon Scenario yet — that is a separate step (Phase 8,
-below). Every claim in this document is either **locally validated** (proven by an automated test
-you can re-run yourself) or **requires in-app validation** (an assumption about how AI Dungeon's
-runtime behaves, not yet observed). Where that distinction matters, it is called out explicitly.
+## Quick install in an existing Scenario
 
-## 1. Get the four script files — no clone, no Node, no build
+1. On [AI Dungeon](https://aidungeon.com/), create or edit a Scenario. Go to **Details → Scripting**, enable **Scripts Enabled**, then open **Edit Scripts**.
+2. Open [`Library.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js), use the file page's **Copy** button, replace the entire **Library** tab, and click **Save**.
+3. Use the same file-page Copy button for each remaining matching tab:
+   - **Input**: [`Input.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Input.js)
+   - **Context**: [`Context.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Context.js)
+   - **Output**: [`Output.js`](https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Output.js)
+4. Click **Save** again. Do not paste one file into a different tab.
+5. Start or continue an Adventure from the Scenario. Follow the smoke test below before treating Chronicle as active in a long-running story.
 
-**You do not need to clone this repository, install Node/npm, or run any build command to install
-Chronicle.** `Library.js` is Chronicle's actual engine, big enough to need its own file (linked
-below); `Input.js`, `Context.js`, and `Output.js` are each ~20 lines and pasted directly below,
-same as `Library.js`'s content would be if it weren't too long for this to stay readable.
+Use the GitHub **Copy** button on the linked file page for every tab. Do not manually select code from this guide: it intentionally contains no embedded script copies, so there is no Markdown fence to accidentally paste.
 
-| File | AI Dungeon tab | How to get it |
-|---|---|---|
-| `Library.js` | **Library** | Open <https://github.com/BartholomeuBach/Chronicle/blob/main/dist/aidungeon/Library.js>, click the **copy** icon in the top-right corner (or select all and copy). |
-| `Input.js` | **Input** | Copy the block in step 2 of section 2, below. |
-| `Context.js` | **Context** | Copy the block in step 3 of section 2, below. |
-| `Output.js` | **Output** | Copy the block in step 4 of section 2, below. |
+## Smoke test: prove the installation path
 
-Each file is self-contained (no `import`/`require`, verified by `npm run verify:dist`) and is
-meant to be pasted whole into its matching tab, replacing that tab's contents.
+This test is intentionally simple. It proves only that the installation created the expected Chronicle projections; it does not prove that the elapsed-time reasoner is accurate.
 
-**Locally validated, not a claim about GitHub:** two CI checks, both part of `npm run check`
-(wired into `.github/workflows/check.yml`), keep all four in sync with source automatically —
-`verify:dist:fresh` for the `dist/aidungeon/*.js` files themselves, `verify:embedded-snippets` for
-the three copies pasted into this document and `README.md` below. Either fails the build the moment
-source and an installable copy — file or pasted snippet — disagree. That guarantees `main`'s
-content is internally consistent; it does not mean GitHub itself is guaranteed available or
-unaltered, which is the same trust boundary as for any GitHub-hosted file or page.
+### Standard recovery path
 
-<sub>Building from source (`npm install && npm run build`) exists only for developers modifying
-Chronicle's TypeScript. It regenerates these same four files in place; it has never been required
-to install Chronicle. `npm run verify:dist` checks the build's structural validity (self-contained,
-`modifier(text)` present); `npm run verify:dist:fresh` and `npm run verify:embedded-snippets`
-separately check that the build and this document's pasted copies match what's committed — see
-`06_testing_strategy.md` in this project's internal `agent_documentation/` (not part of the public
-repo) for how these compose into `npm run check`.</sub>
+Use this when the Scenario does not already contain a `Configure Chronicle` card.
 
-## 2. Paste the scripts, Library first
+1. With all four tabs saved, play one ordinary turn.
+2. Open Story Cards. **Configure Chronicle** should now exist.
+3. Play a second ordinary turn.
+4. Open Story Cards again. **Chronicle Temporal State** should now exist. Its Entry should have this shape:
 
-The operational rule is simple: **paste and save Library first, then paste Input/Context/Output,
-then save again.**
+```text
+[Chronicle]
+Current story time: YYYY/MM/DD HH:MM:SS.
+Time of day: <period>.
+```
 
-1. Open your Scenario's **Details -> Scripting**. Paste `Library.js` (from section 1 above) into
-   the **Library** tab, then **save now**, before touching the other three tabs.
+The first turn deliberately creates the configuration card without initializing time. This is not a failure: it gives the creator a real chance to choose a Manual date before the timeline is created. The second eligible turn initializes the timeline.
 
-   ⚠️ **For steps 2-4 below: use each code block's own copy button** (the clipboard icon in its
-   top-right corner on hover), not a manual click-and-drag text selection. Manually selecting text on
-   a rendered Markdown page risks grabbing a stray ` ``` ` fence marker along with the code — a single
-   extra ` ``` ` at the start or end of what you paste is enough to break the whole script. This
-   reproduces, byte for byte, the exact "Unexpected end of input" syntax error AI Dungeon reports when
-   starting an Adventure with a broken script — confirmed locally by deliberately mangling each
-   artifact this way and parsing the result (see `agent_documentation/05_known_limitations.md`).
-   After pasting each of Input/Context/Output, confirm the first line reads exactly `// Chronicle --
-   paste this file into the AI Dungeon <tab> script tab.` and the last line exactly `})();`, with no
-   ` ``` ` anywhere in between.
-2. Select the `Input` tab, delete everything in it, and paste this:
+### If the card was pre-created
 
-   <!-- chronicle:dist-embed:Input:start -->
-   ```js
-   // Chronicle -- paste this file into the AI Dungeon Input script tab.
-   "use strict";
-   (() => {
-     // src/aidungeon/non-empty-text.ts
-     function nonEmptyText(text2) {
-       return text2 === "" ? "\u200B" : text2;
-     }
+If you add `Configure Chronicle` to the Scenario's own Story Cards before the Adventure begins, Chronicle reads it on the first eligible turn. In that path, **Chronicle Temporal State** should appear after the first turn instead of the second.
 
-     // src/aidungeon/runtime-guards.ts
-     function isPlainObject(value) {
-       return typeof value === "object" && value !== null && !Array.isArray(value);
-     }
-     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
-       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
-       return {
-         storyCards: storyCards2,
-         addStoryCard: addStoryCard2,
-         updateStoryCard: updateStoryCard2,
-         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
-       };
-     }
+If the expected card does not appear, stop the smoke test and use the troubleshooting section. Do not change narrative prompts or time settings to guess around an installation fault.
 
-     // src/aidungeon/input.ts
-     var modifier = (value) => {
-       const safeText = typeof value === "string" ? value : "";
-       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
-       const runtime = globalThis.ChronicleAIDungeon;
-       if (runtime === void 0) return { text: nonEmptyText(safeText) };
-       const actionCount = info === void 0 ? void 0 : info.actionCount;
-       const result = runtime.onInput(safeText, {
-         state,
-         actionCount,
-         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-       });
-       return { text: result };
-     };
-     modifier(text);
-   })();
-   ```
-   <!-- chronicle:dist-embed:Input:end -->
+## Optional advanced setup: choose the starting date
 
-3. Select the `Context` tab, delete everything in it, and paste this:
+For a known fictional starting timestamp, pre-create the configuration card at the Scenario level before starting an Adventure:
 
-   <!-- chronicle:dist-embed:Context:start -->
-   ```js
-   // Chronicle -- paste this file into the AI Dungeon Context script tab.
-   "use strict";
-   (() => {
-     // src/aidungeon/non-empty-text.ts
-     function nonEmptyText(text2) {
-       return text2 === "" ? "\u200B" : text2;
-     }
-
-     // src/aidungeon/runtime-guards.ts
-     function isPlainObject(value) {
-       return typeof value === "object" && value !== null && !Array.isArray(value);
-     }
-     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
-       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
-       return {
-         storyCards: storyCards2,
-         addStoryCard: addStoryCard2,
-         updateStoryCard: updateStoryCard2,
-         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
-       };
-     }
-
-     // src/aidungeon/context.ts
-     var modifier = (value) => {
-       const safeText = typeof value === "string" ? value : "";
-       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
-       const runtime = globalThis.ChronicleAIDungeon;
-       if (runtime === void 0) return { text: nonEmptyText(safeText) };
-       const actionCount = info === void 0 ? void 0 : info.actionCount;
-       const maxChars = info === void 0 ? void 0 : info.maxChars;
-       const memoryLength = info === void 0 ? void 0 : info.memoryLength;
-       const result = runtime.onContext(safeText, {
-         state,
-         actionCount,
-         maxChars,
-         memoryLength,
-         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-       });
-       return { text: result };
-     };
-     modifier(text);
-   })();
-   ```
-   <!-- chronicle:dist-embed:Context:end -->
-
-4. Select the `Output` tab, delete everything in it, and paste this:
-
-   <!-- chronicle:dist-embed:Output:start -->
-   ```js
-   // Chronicle -- paste this file into the AI Dungeon Output script tab.
-   "use strict";
-   (() => {
-     // src/aidungeon/non-empty-text.ts
-     function nonEmptyText(text2) {
-       return text2 === "" ? "\u200B" : text2;
-     }
-
-     // src/aidungeon/runtime-guards.ts
-     function isPlainObject(value) {
-       return typeof value === "object" && value !== null && !Array.isArray(value);
-     }
-     function usableStoryCardGlobals(storyCards2, addStoryCard2, updateStoryCard2, removeStoryCard2) {
-       if (!Array.isArray(storyCards2) || typeof addStoryCard2 !== "function" || typeof updateStoryCard2 !== "function") return void 0;
-       return {
-         storyCards: storyCards2,
-         addStoryCard: addStoryCard2,
-         updateStoryCard: updateStoryCard2,
-         removeStoryCard: typeof removeStoryCard2 === "function" ? removeStoryCard2 : void 0
-       };
-     }
-
-     // src/aidungeon/output.ts
-     var modifier = (value) => {
-       const safeText = typeof value === "string" ? value : "";
-       if (!isPlainObject(state)) return { text: nonEmptyText(safeText) };
-       const runtime = globalThis.ChronicleAIDungeon;
-       if (runtime === void 0) return { text: nonEmptyText(safeText) };
-       const actionCount = info === void 0 ? void 0 : info.actionCount;
-       const result = runtime.onOutput(safeText, {
-         state,
-         actionCount,
-         storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
-       });
-       return { text: result };
-     };
-     modifier(text);
-   })();
-   ```
-   <!-- chronicle:dist-embed:Output:end -->
-
-5. **Save again**, now that all four tabs are pasted.
-
-**Library must be saved before the other three are exercised.** Chronicle's Input/Context/Output
-scripts call a single shared function that Library sets up when it runs; the assumption is that AI
-Dungeon evaluates Library before the other tabs on every turn. This is stated in `library.ts`'s own
-code comment and is **not yet confirmed in-app** — see the "Library load order" row in
-`agent_documentation/10_in_app_validation_playbook.md`. If this assumption is ever wrong for a given
-session (wrong paste order, Library tab not saved, a Library-level script error), Chronicle degrades
-silently: Input/Context/Output all still return your original text unmodified, with no error shown.
-If Chronicle appears to do nothing after installation, this is the first thing to check.
-
-## 3. `Configure Chronicle` — your last checkpoint before the story begins
-
-**`Configure Chronicle`** (Type `Class`) is meant to work as a pre-flight card: something you can
-open and, if you want, switch to `Manual` with your own starting date/time, **before your first
-turn is ever processed** — because Chronicle only reads it and builds the story's timeline the first
-time a turn actually runs, never before. Getting the card to exist *before* that first turn takes one
-of two paths:
-
-### Normal flow — add it to the Scenario once (recommended)
-
-AI Dungeon copies a Scenario's own Story Cards into every Adventure created from it (the same way
-Plot Essentials and other Scenario settings carry over — see the [official Story Cards
-guide](https://help.aidungeon.com/faq/story-cards)). Adding `Configure Chronicle` here, once, when
-you set up the Scenario, means it is present in every Adventure from the very start — genuinely
-before anyone's first action, with no scripting involved:
-
-1. In your Scenario (not inside a played Adventure), open **Details -> Story Cards** and add a new
-   card.
-2. Set **Name/Title** to `Configure Chronicle`, **Type** to `Class`, and paste the Entry/Notes
-   templates below into the card's **Entry** and **Notes** fields.
-3. Save. Every new Adventure started from this Scenario now already has the card, ready to review or
-   edit before playing.
-
-This is a **one-time step per Scenario**, not something a player repeats per Adventure.
-
-### Recovery flow — Chronicle creates it if it's missing
-
-If you skip the step above, or the card is later deleted by accident, Chronicle notices the moment
-its scripts next run and creates the card itself. **This is a recovery measure, not the intended
-onboarding path** — and it comes with a specific guarantee to make up for the lost pre-flight moment:
-when Chronicle has to recovery-create the card, it deliberately does **not** initialize the timeline
-that same turn. Nothing about `state`/the timeline is touched until a *later* turn — giving you a
-real turn to open the freshly-created card and choose Manual before Chronicle ever reads it for real.
-Concretely: play a turn, see that `Configure Chronicle` now exists (Automatic, enabled), optionally
-edit it, then play your *next* turn — that is the one that actually starts the clock.
-
-Either way, once it exists, the card is ready to use exactly as it is:
-
-- `Chronicle Enabled: true` — Chronicle is already on.
-- `Initialization Mode: Automatic` — it will start the story clock from the current real-world time
-  the moment your first turn is actually processed.
-
-**If that's what you want, you can ignore this card completely and just start playing.** Open it
-only if you want a custom starting date/time: switch `Initialization Mode` to `Manual` and fill in
-the Start fields, **before playing the turn that starts your timeline** — see above for exactly when
-that is under each flow.
-
-Its **Entry** (the editable part) looks like this:
+1. Open the Scenario's **Details → Story Cards** editor, not the Story Cards list of a running Adventure.
+2. Add a card named **Configure Chronicle** with type **Class**.
+3. Put the following in its **Entry** field:
 
 ```
 Chronicle Enabled: true
 
 # Choose your starting mode before playing the first turn:
-Initialization Mode: Automatic
+Initialization Mode: Manual
 
 # Used only when Initialization Mode is Manual:
-Start Year:
-Start Month:
-Start Day:
-Start Hour:
-Start Minute:
-Start Second:
-
-AI Temporal Signal: true
-Repair Chronicle Card: false
-```
-
-Field reference — edit values in **Entry**, never in Notes:
-
-- `Chronicle Enabled` — `true`/`false`. Anything else is treated as `false`. Takes effect any time
-  you change it, before or after the timeline has started.
-- `Initialization Mode` — `Automatic` starts the story clock at the real current time in the
-  `America/New_York` zone (**requires in-app validation** — `Intl.DateTimeFormat` behavior in the
-  sandbox is unconfirmed). `Manual` uses the Start Year/Month/Day/Hour/Minute/Second fields below it;
-  any left blank fall back to the current time for that component. **Read only once** — the first
-  time Chronicle actually processes a turn and initializes its timeline.
-- `Start Year`/`Month`/`Day`/`Hour`/`Minute`/`Second` — only used when `Initialization Mode` is
-  `Manual`, and, like it, **read only once**, the first time the timeline initializes.
-- `AI Temporal Signal` — leave `true` unless you want Chronicle to use only its deterministic rules.
-  Either setting keeps the same safety guarantees; this only changes whether the AI Dungeon narrator's
-  own judgment is asked to supplement them (see `agent_documentation/04_decisions.md`, D-026). Takes
-  effect any time you change it.
-- `Repair Chronicle Card` — leave `false` normally. Chronicle detects (but does not delete) duplicate
-  temporal-state cards on its own; set this `true` only when you explicitly want duplicates removed,
-  then set it back to `false`.
-
-The card's **Notes** field is documentation only — an explanation of each setting and basic
-troubleshooting. Chronicle never reads settings from Notes on a canonical card; it only exists to
-help you fill in Entry correctly.
-
-**Once the timeline has initialized (your first turn has been processed), editing `Initialization
-Mode` or the Start fields again does nothing.** They are consumed exactly once, at the moment the
-timeline is born, precisely so you can freely revisit this card afterward without ever risking a
-silent reset. This is why Manual, if you want it, needs to be chosen *before* that first turn, not
-after.
-
-**For your first-ever test, switch `Initialization Mode` to `Manual` and fill in fixed values**
-before playing your first turn:
-
-```
-Chronicle Enabled: true
-Initialization Mode: Manual
 Start Year: 2026
 Start Month: 9
 Start Day: 16
 Start Hour: 18
 Start Minute: 0
 Start Second: 0
+
 AI Temporal Signal: true
 Repair Chronicle Card: false
 ```
 
-This gives the smoke test below (section 4) an exact, predictable expected value —
-`2026/09/16 18:00:00` — instead of "whatever the current time happens to be," and rules out
-`Automatic`'s `Intl.DateTimeFormat`/timezone dependency (itself one of the things this first test is
-meant to help confirm, not something you want as a confound while checking Chronicle itself).
-`Automatic` is the normal, recommended mode for everyday play once installation is confirmed
-working — switch back to it for your next Scenario (a running story's mode cannot change once
-initialized, per the one-shot behavior above) whenever you like after this first test.
+4. Save the Scenario, then start a fresh Adventure from it.
+5. On the first eligible turn, check that **Chronicle Temporal State** shows exactly:
 
-**Already have an older `chronicle-configuration` card from a previous version?** Nothing to do —
-Chronicle finds it automatically (by its old `keys` identifier), renames/retypes it to the new
-`Configure Chronicle` / `Class` card, and moves any settings that were in its Notes into the new
-Entry, preserving your existing values. It does not create a second card, and — since the card
-already existed — this does not trigger the recovery flow's initialization delay above.
+```text
+[Chronicle]
+Current story time: 2026/09/16 18:00:00.
+Time of day: evening.
+```
 
-**If the card is ever recreated as recovery after your timeline already started** (e.g. it was
-deleted mid-story), that recreation never resets the already-initialized timeline; it only rebuilds
-the card itself.
+The Entry field is the configuration source. Notes are help text only. `Initialization Mode` and all `Start ...` fields are read once, when the timeline is first initialized; editing them later never reseeds an active story clock.
 
-## 4. Smoke test: confirm Chronicle initialized
+### Configuration reference
 
-This is the one check every install should run before anything else — it tells you, in under a
-minute, whether Chronicle is actually active or only appears to be installed.
+| Field | Behavior |
+|---|---|
+| `Chronicle Enabled` | `true` enables processing; `false` pauses it without deleting the runtime state. |
+| `Initialization Mode` | `Automatic` uses the runtime's current New York civil time; `Manual` reads the six Start fields. It is one-shot at initialization. |
+| `Start Year` through `Start Second` | Used only by Manual mode, once. Blank components fall back to the current runtime component. |
+| `AI Temporal Signal` | `true` enables the optional narrator-provided signal; `false` uses the deterministic reasoner only. It can be changed while playing. |
+| `Repair Chronicle Card` | Leave `false` normally. Set `true` only to explicitly remove duplicate temporal-state cards, then set it back to `false`. |
 
-1. Play (or Continue) one turn in your Scenario, with the Manual example from section 3 above
-   already in place on `Configure Chronicle`.
-   - **If you went through the normal flow** (card added to the Scenario beforehand), this first
-     turn already initializes the timeline.
-   - **If you're relying on the recovery flow** (no card added beforehand), this first turn instead
-     creates `Configure Chronicle` — open it now, set it to Manual with the example values, then play
-     a **second** turn; that second turn is the one that initializes the timeline.
-2. Open your Story Cards and look for a card named **`Chronicle Temporal State`**.
-3. Its entry should read:
-   ```
-   [Chronicle]
-   Current story time: 2026/09/16 18:00:00.
-   Time of day: evening.
-   ```
-   (using the recommended Manual example from section 3 above) — or a little later than that, if
-   your first action already gave Chronicle evidence that some time passed during it.
+The current automatic-time behavior and the Scenario-to-Adventure Story Card handoff are part of Phase 8 validation; the Manual path above avoids using the automatic-time default during the first smoke test.
 
-**If that card never appears:** see "5. If something looks wrong" below — most likely cause is
-Library not having been saved before the other tabs (section 2), or `Chronicle Enabled` having been
-switched to `false` on the `Configure Chronicle` card.
+## Troubleshooting
 
-- **Locally validated:** on the first enabled turn, Chronicle creates both the `Configure Chronicle`
-  card (if none existed yet) and the `Chronicle Temporal State` card showing only the current
-  in-story date/time — no Ledger history, no confidence scores, nothing else. The model's context
-  gains a compact three-line `[Chronicle]` block with the same current time. Both are proven by
-  automated tests (`tests/aidungeon-runtime.test.ts`, `tests/aidungeon/story-cards/`).
-- **Requires in-app validation:** whether the `Chronicle Temporal State` card's Notes field actually
-  shows the bounded Ledger history you'd expect, whether card **Title** is readable/settable the way
-  Chronicle's card-discovery logic assumes (the `title`/`description` Story Card fields are a
-  community-observed mapping, not part of AI Dungeon's official documented API — see
-  `agent_documentation/03_ai_dungeon_integration.md`), whether `state.message` renders as a visible
-  toast/popup for a time-of-day transition, and whether the AI Dungeon narrator actually honors the
-  injected `<<chronicle:...>>` signal instruction. None of these are assumed working — see
-  `agent_documentation/10_in_app_validation_playbook.md` for the full test matrix to run yourself,
-  and `agent_documentation/05_known_limitations.md` / `11_critical_assumptions_and_silent_failures.md`
-  for every currently-known gap and its evidence level.
+### “Unexpected end of input” in Input, Context, or Output
 
-## 5. If something looks wrong
+This is a script parse error before Chronicle can run.
 
-**"This Scenario has a bug in its Input Modifier: Unexpected end of input"** (or the same message
-naming Context or Output) when you try to start an Adventure — before Chronicle ever runs at all:
-this is a script parse failure, not a Chronicle runtime error, so it won't appear as
-`state.chronicleRuntimeError`. Re-open that exact tab and re-paste its code using the code block's
-copy button from step 2 above, then check that the pasted content starts with `// Chronicle --` and
-ends with `})();`, with no stray ` ``` ` anywhere. A leftover Markdown fence marker from a manual copy
-is the one cause of this exact error message reproduced locally (see
-`agent_documentation/05_known_limitations.md`); it is not a defect in the published
-`dist/aidungeon/*.js` files themselves, which are verified parseable on every change
-(`npm run verify:dist:syntax`).
+1. Reopen the tab named in the error.
+2. Reopen that tab's matching linked `.js` file above.
+3. Use the GitHub file page's **Copy** button, replace the tab completely, and save.
+4. Repeat the smoke test.
 
-Chronicle surfaces problems through a transient `state.chronicleRuntimeError` diagnostic rather than
-crashing a turn. If play feels wrong and you have script/state inspection access, check that key
-first — its message is written to explain what happened (invalid persisted state, a duplicate Story
-Card, a configuration card that could not be created, an unsupported time range, or an unexpected
-internal error) rather than failing silently.
+A stray Markdown fence was one locally reproduced mechanism for this exact message. This guide avoids that route by never embedding the script source. A repeated error after re-copying the canonical file is Phase 8 evidence of a platform incompatibility or another installation problem, not proof that the narrative reasoner failed.
 
-Two situations remain genuinely silent by design and are not diagnosed this way:
+### No Chronicle cards appear
 
-- **Library not evaluated first** (see step 2) — every hook passes text through unmodified, and
-  Chronicle never gets a chance to run at all, including its own configuration-card creation.
-- **The recovery flow's one-turn initialization delay** (section 3) — the turn that recovery-creates
-  `Configure Chronicle` intentionally does not start the timeline or write `Chronicle Temporal
-  State` yet. This is expected, not an error; it resolves itself on your very next turn.
+Confirm all of the following before reinstalling:
 
-If a hook ever runs with a missing or malformed `state`, `storyCards`, `addStoryCard`, or
-`updateStoryCard` global (an AI Dungeon runtime irregularity, not a normal condition), Chronicle
-degrades to a safe passthrough for that hook instead of erroring the turn — see
-`agent_documentation/05_known_limitations.md`.
+- **Scripts Enabled** is on for this Scenario.
+- Every file went into its matching tab.
+- **Library** was saved before Input, Context, and Output.
+- The Scenario/Adventure was actually started after the last save.
 
-## What this package does not include yet
+Chronicle's three modifiers safely pass text through if Library was not available. That prevents a broken turn, but can make Chronicle look inactive. The actual Library load order remains an in-app validation item.
 
-- Read-only player commands (`/chronicle`, `/chronicle ledger`) are planned but not implemented —
-  see `agent_documentation/PROJECT_PLANNING.md`, Phase 7.
-- Nothing here has been exercised inside a real AI Dungeon Scenario. Phase 8
-  (`agent_documentation/10_in_app_validation_playbook.md`) is the next step after this package is
-  installed, and its results — not this document — are what turn an in-app assumption into a
-  confirmed fact.
+### Only Configure Chronicle appears
+
+Expected on the first turn of the recovery path. Play a second ordinary turn. If you want initialization on the first turn, pre-create the configuration card in the Scenario as described above.
+
+### Configure Chronicle exists but Chronicle Temporal State does not
+
+Check `Chronicle Enabled: true` in the card Entry, then play the next eligible turn. If the card still does not appear, capture the exact UI error and Script Test result before changing any Chronicle configuration. That evidence is needed to distinguish configuration, platform, and lifecycle failures.
+
+### Scripts appear installed but Story Cards never update
+
+Do not assume that the Story Card API is working merely because local tests pass. Record the exact four artifact revision, UI/app version, Script Test output, and observed Story Cards; this belongs in the Phase 8 investigation.
+
+## Scope and validation status
+
+Chronicle's four committed artifacts are the sole manually installable package. The project does not yet publish a ready-made Scenario; a future **Chronicle Demo Scenario** should preinstall these scripts, include a `Configure Chronicle` card with the Manual smoke-test timestamp, and offer a short opening scene. It must be tested as a Scenario artifact before being presented as an easier path.
+
+The next step is the in-app Phase 8 playbook: validate script installation, Library load order, configuration-card lifecycle, title/Notes behavior, context injection, retry/undo/reload, and AI Temporal Signal behavior. Until those observations exist, Chronicle is ready to install and test — not confirmed operational in AI Dungeon.

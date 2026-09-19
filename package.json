@@ -12,9 +12,8 @@
     "verify:dist": "node tools/verify-dist.mjs",
     "verify:dist:syntax": "node tools/verify-dist-syntax.mjs",
     "verify:dist:fresh": "node tools/verify-dist-fresh.mjs",
-    "verify:embedded-snippets": "node tools/verify-embedded-snippets.mjs",
-    "sync:embedded-snippets": "node tools/sync-embedded-snippets.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run verify:dist && npm run verify:dist:syntax && npm run verify:dist:fresh && npm run verify:embedded-snippets"
+    "verify:install-guide": "node tools/verify-install-guide.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run verify:dist && npm run verify:dist:syntax && npm run verify:dist:fresh && npm run verify:install-guide"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
