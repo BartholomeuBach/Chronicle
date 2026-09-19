@@ -61,9 +61,10 @@ describe("Hybrid Temporal Reasoner (D-026, Cenário 1)", () => {
     });
   });
 
-  it("falls through to the fallback's own decision when no signal is present, tagged as absent", () => {
-    expect(decide("You walk to the market.")).toEqual({
-      ...fallback.decide({ currentState, playerAction: undefined, completedNarrative: "x", activityPriors: [] }),
+  it("withholds a heuristic scene advance when the requested signal is absent", () => {
+    expect(decide("You walk to the market.")).toMatchObject({
+      elapsedTime: { days: 0, hours: 0, minutes: 0, seconds: 0 },
+      mode: "conservative-fallback",
       signalStatus: "absent"
     });
   });

@@ -520,7 +520,21 @@
             signalStatus: "accepted"
           });
         }
-        if (signal.reason === "absent") return Object.freeze({ ...fallback.decide(input), signalStatus: "absent" });
+        if (signal.reason === "absent") {
+          const fallbackDecision = fallback.decide(input);
+          if (fallbackDecision.mode === "scene-progression") {
+            return Object.freeze({
+              ...fallbackDecision,
+              elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }),
+              mode: "conservative-fallback",
+              rationale: "Model signal absent; withheld activity-prior time advance.",
+              confidence: "low",
+              hasTemporalEvidence: false,
+              signalStatus: "absent"
+            });
+          }
+          return Object.freeze({ ...fallbackDecision, signalStatus: "absent" });
+        }
         return withRejectionNote(fallback.decide(input), "rejected-malformed", signal.reason);
       }
     });
@@ -1098,8 +1112,11 @@ ${appended}`);
   function chronicleSignalInstructionBlock() {
     return `${CHRONICLE_SIGNAL_BLOCK_START}
 <SYSTEM>
-# CHRONICLE TEMPORAL REPORT \u2014 REQUIRED
-After the story prose, write exactly one final directive: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>. Report only time that truly elapsed in the present scene. Use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>> for an observation, dialogue beat, plan, memory, dream, flashback, hypothetical, or any beat with no real elapsed time. Never mention this directive to the player.
+# CHRONICLE TEMPORAL REPORT \u2014 REQUIRED OUTPUT HEADER
+Begin the response with exactly one header: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>, then a newline, then the story prose. For no current-scene elapsed time, begin with <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. A clock check, dialogue beat, plan, memory, dream, flashback, or hypothetical is none. Never mention this protocol in the story prose.
+# EXACT SHAPE
+<<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>
+Thirty minutes later, story prose continues here.
 </SYSTEM>
 ${CHRONICLE_SIGNAL_BLOCK_END}`;
   }

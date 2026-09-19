@@ -437,8 +437,8 @@ describe("AI Temporal Signal (D-026)", () => {
     const state: Record<string, unknown> = {};
     const { storyCards } = cardsFor(manualNotes());
     const contextualized = createChronicleRuntime(ruleBasedTemporalReasoner).onContext("Base context.", { state, storyCards });
-    expect(contextualized).toContain("memory, dream, flashback, hypothetical");
-    expect(contextualized).toContain("no real elapsed time");
+    expect(contextualized).toContain("memory, dream, flashback, or hypothetical");
+    expect(contextualized).toContain("For no current-scene elapsed time");
   });
 
   it("does not append the temporal protocol when AI Temporal Signal is disabled", () => {

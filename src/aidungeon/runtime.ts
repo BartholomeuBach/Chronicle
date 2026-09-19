@@ -153,7 +153,7 @@ const CHRONICLE_SIGNAL_BLOCK_END = "[[chronicle:ai-signal-instruction:end]]";
  * the narrator reliably follows this is unvalidated (Phase 8).
  */
 function chronicleSignalInstructionBlock(): string {
-  return `${CHRONICLE_SIGNAL_BLOCK_START}\n<SYSTEM>\n# CHRONICLE TEMPORAL REPORT — REQUIRED\nAfter the story prose, write exactly one final directive: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>. Report only time that truly elapsed in the present scene. Use <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>> for an observation, dialogue beat, plan, memory, dream, flashback, hypothetical, or any beat with no real elapsed time. Never mention this directive to the player.\n</SYSTEM>\n${CHRONICLE_SIGNAL_BLOCK_END}`;
+  return `${CHRONICLE_SIGNAL_BLOCK_START}\n<SYSTEM>\n# CHRONICLE TEMPORAL REPORT — REQUIRED OUTPUT HEADER\nBegin the response with exactly one header: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>, then a newline, then the story prose. For no current-scene elapsed time, begin with <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. A clock check, dialogue beat, plan, memory, dream, flashback, or hypothetical is none. Never mention this protocol in the story prose.\n# EXACT SHAPE\n<<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>\nThirty minutes later, story prose continues here.\n</SYSTEM>\n${CHRONICLE_SIGNAL_BLOCK_END}`;
 }
 
 /**

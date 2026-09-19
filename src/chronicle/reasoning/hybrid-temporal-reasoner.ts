@@ -1,5 +1,6 @@
 import { hasNonCurrentTemporalFrame } from "./rule-based-temporal-reasoner.js";
 import { readModelTemporalSignal } from "./model-temporal-signal.js";
+import { createElapsedTime } from "../calendar/elapsed-time.js";
 import type { TemporalReasoner, TemporalReasonerDecision, TemporalReasonerInput } from "./temporal-reasoner.js";
 import type { TemporalSignalStatus } from "./temporal-signal-status.js";
 
@@ -42,7 +43,25 @@ export function createHybridTemporalReasoner(fallback: TemporalReasoner): Tempor
         });
       }
 
-      if (signal.reason === "absent") return Object.freeze({ ...fallback.decide(input), signalStatus: "absent" });
+      if (signal.reason === "absent") {
+        const fallbackDecision = fallback.decide(input);
+        // In live play, a narrator that omits the requested report must not
+        // turn a weak activity prior into invented story time. Explicit and
+        // transition evidence remain usable; only the heuristic scene prior
+        // is withheld until the narrator supplies a valid signal.
+        if (fallbackDecision.mode === "scene-progression") {
+          return Object.freeze({
+            ...fallbackDecision,
+            elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: 0 }),
+            mode: "conservative-fallback",
+            rationale: "Model signal absent; withheld activity-prior time advance.",
+            confidence: "low",
+            hasTemporalEvidence: false,
+            signalStatus: "absent"
+          });
+        }
+        return Object.freeze({ ...fallbackDecision, signalStatus: "absent" });
+      }
       return withRejectionNote(fallback.decide(input), "rejected-malformed", signal.reason);
     }
   });
