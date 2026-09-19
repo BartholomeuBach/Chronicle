@@ -1046,8 +1046,8 @@ Story time: ${formatChronicleDateTime(next)}.`;
         }
         const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
         if (context.maxChars !== void 0 && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
-        return nonEmptyText(text.includes(projection) ? text : `${projection}
-${text}`);
+        return nonEmptyText(text.includes(projection) ? text : `${text}
+${projection}`);
       },
       onOutput(text, context) {
         var _a, _b, _c;

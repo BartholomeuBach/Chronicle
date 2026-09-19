@@ -17,7 +17,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(nonEmptyText("")).toBe("\u200B");
   });
 
-  it("captures input and injects only current temporal state into Context", () => {
+  it("captures input and appends only current temporal state to Context", () => {
     const state: Record<string, unknown> = {};
     initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
     const runtime = createChronicleRuntime();
@@ -28,7 +28,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
       updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
     };
     expect(runtime.onInput("I walk.", { state, storyCards })).toBe("I walk.");
-    expect(runtime.onContext("Base context.", { state, storyCards })).toBe("[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening.\nBase context.");
+    expect(runtime.onContext("Base context.", { state, storyCards })).toBe("Base context.\n[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening.");
     expect(JSON.stringify(state)).toContain("I walk.");
   });
 
@@ -71,7 +71,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
       updateStoryCard: () => { throw new Error("simulated platform failure"); }
     };
     expect(createChronicleRuntime().onContext("Base context.", { state, storyCards })).toBe(
-      "[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening.\nBase context."
+      "Base context.\n[Chronicle]\nCurrent story time: 2026/04/13 19:32:00.\nTime of day: evening."
     );
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("Story Card sync failed unexpectedly");
     expect(state[CHRONICLE_RUNTIME_ERROR_KEY]).toContain("Canonical time is unaffected");

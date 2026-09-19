@@ -17,7 +17,11 @@ await Promise.all(
       entryPoints: [resolve(repositoryRoot, entryPoint)],
       outfile: resolve(repositoryRoot, "dist", "aidungeon", `${name}.js`),
       bundle: true,
-      format: "iife",
+      // AI Dungeon requires the final line of every modifier tab to be the
+      // direct `modifier(text)` invocation. An IIFE would add a closing
+      // `})();` after that call, which the Script Test kernel rejects. The
+      // Library has no modifier entry point and remains safely encapsulated.
+      format: name === "Library" ? "iife" : "esm",
       target: "es2018",
       legalComments: "none",
       // Plain ASCII deliberately: this is the very first line of every pasted
@@ -25,7 +29,7 @@ await Promise.all(
       // more thing that could be mangled by a lossy copy/paste path. Purely a
       // defensive simplification -- see 05_known_limitations.md.
       banner: {
-        js: `// Chronicle -- paste this file into the AI Dungeon ${name} script tab.`
+        js: `// Chronicle -- paste this file into the AI Dungeon ${name} script tab.${name === "Context" ? "\n// @cache-compatible" : ""}`
       }
     })
   )

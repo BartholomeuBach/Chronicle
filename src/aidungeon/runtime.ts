@@ -89,7 +89,9 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       }
       const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
       if (context.maxChars !== undefined && !text.includes(projection) && text.length + projection.length + 1 > context.maxChars) return nonEmptyText(text);
-      return nonEmptyText(text.includes(projection) ? text : `${projection}\n${text}`);
+      // Cache-efficient AI Dungeon models only accept additions after the
+      // already-built context. Keep Chronicle's compact projection there.
+      return nonEmptyText(text.includes(projection) ? text : `${text}\n${projection}`);
     },
     onOutput(text: string, context: AIDungeonHookContext) {
       clearChronicleNotification(context.state);
