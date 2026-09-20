@@ -9,6 +9,12 @@ describe("ruleBasedTemporalReasoner", () => {
     expect(decide("Depois de 2 horas, ele chega.")).toMatchObject({ elapsedTime: { hours: 2 }, mode: "explicit-duration", confidence: "high" });
     expect(decide("After 0 minutes, he arrives.")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "explicit-duration", hasTemporalEvidence: true });
   });
+  it("recognizes English number words and precise natural-language durations", () => {
+    expect(decide("For exactly twenty minutes, you watch the creature.")).toMatchObject({ elapsedTime: { minutes: 20 }, mode: "explicit-duration" });
+    expect(decide("Twenty minutes later, the store falls silent.")).toMatchObject({ elapsedTime: { minutes: 20 }, mode: "explicit-duration" });
+    expect(decide("After half an hour, the rain stops.")).toMatchObject({ elapsedTime: { minutes: 30 }, mode: "explicit-duration" });
+    expect(decide("Forty-five minutes later, the train arrives.")).toMatchObject({ elapsedTime: { minutes: 45 }, mode: "explicit-duration" });
+  });
   it("recognizes a completed sleep-to-morning transition", () => {
     expect(decide("Ele dormiu e despertou com os raios de sol.", "Vou dormir agora")).toMatchObject({ elapsedTime: { hours: 7, minutes: 30 }, mode: "explicit-transition" });
   });

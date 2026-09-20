@@ -37,12 +37,14 @@ The exact player-action/output transcript for each `beatId` must be captured bef
 
 ## Corrective work implemented — pending live validation
 
-1. The optional temporal-report contract now appends to Context, next to the current clock, with a strict one-tag output format. The old Chronicle block is removed from Authors Note while preserving creator-owned text.
-2. A clock or screen observation now returns a zero delta before activity priors are considered.
-3. The local regression suite covers the observation case and the Context protocol. These changes have not yet been validated in a new live Scenario.
+1. The temporal-report contract now appends beside the clock with a compact first-line tag. If the prior output omitted its tag, the next Context includes a concise corrective reminder.
+2. Notes now expose `chronicleSignalDiagnostic`: protocol delivery status, reminder status, and the final model-signal status. It does not copy hidden instruction text or story prose.
+3. A clock or screen observation now returns a zero delta before activity priors are considered.
+4. Explicit English durations recognize number words and natural phrasing such as `For exactly twenty minutes`, `Twenty minutes later`, `half an hour`, and `Forty-five minutes later`.
+5. The local regression suite covers the protocol, diagnostics, and the expanded duration parser. These changes still need live validation.
 
 ## Deferred corrective work
 
 1. Capture paired player action, completed narrator output, and ledger record for a small regression corpus.
 2. Reclassify activity priors as corroborating evidence, not independent evidence for advancing time; introduce a separately tested completion/summary gate before applying one.
-3. Add an opt-in diagnostic projection that records signal status and selected evidence without exposing hidden instructions to the player.
+3. Capture a small live corpus using `chronicleSignalDiagnostic` to measure model adherence by story model and context size.

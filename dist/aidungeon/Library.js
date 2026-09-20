@@ -80,15 +80,59 @@
     return new RegExp(`\\b${escaped}(?:s|es|ed|ing)?\\b`).test(text);
   }
   function findExplicitDuration(text) {
-    var _a, _b;
-    const match = /(?:(?:after|for|during|over|within|depois de|após|durante|por)\s+)(\d+)\s*(segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)|(\d+)\s*(segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)\s*(?:later|passed|passaram)/.exec(text);
+    var _a, _b, _c, _d;
+    const halfHour = /(?:(?:after|for|during|over|within)\s+(?:exactly\s+)?half an hour|half an hour\s+later)/.test(text);
+    if (halfHour) return createElapsedTime({ days: 0, hours: 0, minutes: 30, seconds: 0 });
+    const number = "(?:\\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\\s]+(?:one|two|three|four|five|six|seven|eight|nine))?";
+    const unit = "(?:segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)";
+    const match = new RegExp(`(?:(?:after|for|during|over|within)\\s+(?:exactly\\s+|about\\s+|approximately\\s+)?(${number})\\s*(${unit})|(?:depois de|ap\xF3s|durante|por)\\s+(\\d+)\\s*(${unit})|(${number})\\s*(${unit})\\s*(?:later|passed|passaram))`).exec(text);
     if (match === null) return void 0;
-    const value = Number((_a = match[1]) != null ? _a : match[3]);
-    const unit = (_b = match[2]) != null ? _b : match[4];
-    if (/^(segundos?|seconds?)$/.test(unit)) return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: value });
-    if (/^(minutos?|minutes?)$/.test(unit)) return createElapsedTime({ days: 0, hours: 0, minutes: value, seconds: 0 });
-    if (/^(horas?|hours?)$/.test(unit)) return createElapsedTime({ days: 0, hours: value, minutes: 0, seconds: 0 });
+    const value = parseNarrativeNumber((_b = (_a = match[1]) != null ? _a : match[3]) != null ? _b : match[5]);
+    const durationUnit = (_d = (_c = match[2]) != null ? _c : match[4]) != null ? _d : match[6];
+    if (value === void 0 || durationUnit === void 0) return void 0;
+    if (/^(segundos?|seconds?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: value });
+    if (/^(minutos?|minutes?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: 0, minutes: value, seconds: 0 });
+    if (/^(horas?|hours?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: value, minutes: 0, seconds: 0 });
     return createElapsedTime({ days: value, hours: 0, minutes: 0, seconds: 0 });
+  }
+  function parseNarrativeNumber(value) {
+    if (/^\d+$/.test(value)) return Number(value);
+    const parts = value.toLowerCase().split(/[\s-]+/);
+    const values = {
+      zero: 0,
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+      thirteen: 13,
+      fourteen: 14,
+      fifteen: 15,
+      sixteen: 16,
+      seventeen: 17,
+      eighteen: 18,
+      nineteen: 19,
+      twenty: 20,
+      thirty: 30,
+      forty: 40,
+      fifty: 50,
+      sixty: 60,
+      seventy: 70,
+      eighty: 80,
+      ninety: 90
+    };
+    if (parts.length === 1) return values[parts[0]];
+    if (parts.length === 2 && values[parts[0]] !== void 0 && values[parts[0]] >= 20 && values[parts[1]] !== void 0 && values[parts[1]] < 10) {
+      return values[parts[0]] + values[parts[1]];
+    }
+    return void 0;
   }
   function findTransitionHour(text) {
     if (/(ao amanhecer|raios de sol|despertou|at sunrise|by sunrise|woke up|morning came)/.test(text)) return 6;
@@ -673,26 +717,27 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
   function renderChronicleStoryCardEntry(state) {
     return renderChronicleTemporalContext(state.currentDateTime);
   }
-  function renderChronicleStoryCardNotes(ledger) {
+  function renderChronicleStoryCardNotes(ledger, signalDiagnostic) {
     const records = ledger.records.slice(-MAX_STORY_CARD_LEDGER_RECORDS).map(renderLedgerRecord);
     return JSON.stringify(
       {
         chronicleTemporalLedger: {
           schemaVersion: 1,
           records
-        }
+        },
+        chronicleSignalDiagnostic: signalDiagnostic
       },
       null,
       2
     );
   }
-  function createChronicleStoryCardProjection(state, ledger) {
+  function createChronicleStoryCardProjection(state, ledger, signalDiagnostic) {
     return Object.freeze({
       keys: CHRONICLE_STORY_CARD_KEY,
       title: CHRONICLE_STORY_CARD_TITLE,
       entry: renderChronicleStoryCardEntry(state),
       type: CHRONICLE_STORY_CARD_TYPE,
-      notes: renderChronicleStoryCardNotes(ledger)
+      notes: renderChronicleStoryCardNotes(ledger, signalDiagnostic)
     });
   }
   function findChronicleStoryCardIndex(storyCards) {
@@ -728,8 +773,8 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
   }
 
   // src/aidungeon/story-cards/sync-chronicle-story-card.ts
-  function syncChronicleStoryCard(runtime, state, ledger, options = {}) {
-    const projection = createChronicleStoryCardProjection(state, ledger);
+  function syncChronicleStoryCard(runtime, state, ledger, options = {}, signalDiagnostic) {
+    const projection = createChronicleStoryCardProjection(state, ledger, signalDiagnostic);
     const matchingIndices = findChronicleStoryCardIndices(runtime.storyCards);
     const existingIndex = matchingIndices[0];
     if (matchingIndices.length > 1 && options.repairDuplicates === true) {
@@ -1032,6 +1077,20 @@ Story time: ${formatChronicleDateTime(next)}.`;
     }
   }
 
+  // src/aidungeon/chronicle-signal-diagnostic.ts
+  var CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY = "chronicleSignalDiagnostic";
+  function isChronicleSignalDiagnostic(value) {
+    if (value === null || typeof value !== "object") return false;
+    const candidate = value;
+    return isProtocolStatus(candidate.protocolStatus) && typeof candidate.reminderIncluded === "boolean" && (candidate.outputSignalStatus === void 0 || isSignalStatus(candidate.outputSignalStatus));
+  }
+  function isProtocolStatus(value) {
+    return value === "appended" || value === "already-present" || value === "omitted-context-limit" || value === "not-observed";
+  }
+  function isSignalStatus(value) {
+    return value === "accepted" || value === "absent" || value === "rejected-malformed" || value === "rejected-contradicted";
+  }
+
   // src/aidungeon/runtime.ts
   var CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
   var CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
@@ -1054,7 +1113,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
         return nonEmptyText(text);
       },
       onContext(text, context) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
         if (!enabled(context)) return nonEmptyText(text);
@@ -1067,18 +1126,29 @@ Story time: ${formatChronicleDateTime(next)}.`;
         }
         const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
         const configuration = readChronicleConfiguration((_b = (_a = context.storyCards) == null ? void 0 : _a.storyCards) != null ? _b : []);
+        const protocolAlreadyPresent = text.includes(CHRONICLE_SIGNAL_BLOCK_START);
+        const reminderIncluded = configuration.aiTemporalSignal && !protocolAlreadyPresent && previousSignalWasAbsent(context.state);
         const additions = [
           text.includes(projection) ? void 0 : projection,
-          configuration.aiTemporalSignal && !text.includes(CHRONICLE_SIGNAL_BLOCK_START) ? chronicleSignalInstructionBlock() : void 0
+          configuration.aiTemporalSignal && !protocolAlreadyPresent ? chronicleSignalInstructionBlock(reminderIncluded) : void 0
         ].filter((value) => value !== void 0);
-        if (additions.length === 0) return nonEmptyText(text);
+        if (additions.length === 0) {
+          if (configuration.aiTemporalSignal && protocolAlreadyPresent) writeSignalDiagnostic(context.state, { protocolStatus: "already-present", reminderIncluded, outputSignalStatus: (_c = readSignalDiagnostic(context.state)) == null ? void 0 : _c.outputSignalStatus });
+          return nonEmptyText(text);
+        }
         const appended = additions.join("\n");
-        if (context.maxChars !== void 0 && text.length + appended.length + 1 > context.maxChars) return nonEmptyText(text);
+        if (context.maxChars !== void 0 && text.length + appended.length + 1 > context.maxChars) {
+          if (configuration.aiTemporalSignal) {
+            writeSignalDiagnostic(context.state, { protocolStatus: "omitted-context-limit", reminderIncluded, outputSignalStatus: (_d = readSignalDiagnostic(context.state)) == null ? void 0 : _d.outputSignalStatus });
+          }
+          return nonEmptyText(text);
+        }
+        if (configuration.aiTemporalSignal) writeSignalDiagnostic(context.state, { protocolStatus: "appended", reminderIncluded });
         return nonEmptyText(`${text}
 ${appended}`);
       },
       onOutput(text, context) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e, _f;
         clearChronicleNotification(context.state);
         ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
@@ -1090,7 +1160,15 @@ ${appended}`);
           const configuration = readChronicleConfiguration((_b = (_a = context.storyCards) == null ? void 0 : _a.storyCards) != null ? _b : []);
           const activeReasoner = configuration.aiTemporalSignal ? hybridReasoner != null ? hybridReasoner : reasoner : reasoner;
           const decision2 = activeReasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
-          const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision: decision2, actionInterpretation: decision2.rationale, confidence: (_c = decision2.confidence) != null ? _c : "low" });
+          if (configuration.aiTemporalSignal) {
+            const previousDiagnostic = readSignalDiagnostic(context.state);
+            writeSignalDiagnostic(context.state, {
+              protocolStatus: (_c = previousDiagnostic == null ? void 0 : previousDiagnostic.protocolStatus) != null ? _c : "not-observed",
+              reminderIncluded: (_d = previousDiagnostic == null ? void 0 : previousDiagnostic.reminderIncluded) != null ? _d : false,
+              outputSignalStatus: (_e = decision2.signalStatus) != null ? _e : "absent"
+            });
+          }
+          const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision: decision2, actionInterpretation: decision2.rationale, confidence: (_f = decision2.confidence) != null ? _f : "low" });
           if (recorded.rejectionReason === "unsupported-range") {
             context.state[CHRONICLE_RUNTIME_ERROR_KEY] = UNSUPPORTED_RANGE_ERROR;
           } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === UNSUPPORTED_RANGE_ERROR) {
@@ -1109,15 +1187,16 @@ ${appended}`);
   }
   var CHRONICLE_SIGNAL_BLOCK_START = "[[chronicle:ai-signal-instruction:start]]";
   var CHRONICLE_SIGNAL_BLOCK_END = "[[chronicle:ai-signal-instruction:end]]";
-  function chronicleSignalInstructionBlock() {
+  function chronicleSignalInstructionBlock(reminderIncluded) {
+    const reminder = reminderIncluded ? "\nThe previous reply omitted this required tag. Do not omit it again." : "";
     return `${CHRONICLE_SIGNAL_BLOCK_START}
-<SYSTEM>
-# CHRONICLE TEMPORAL REPORT \u2014 REQUIRED OUTPUT HEADER
-Begin the response with exactly one header: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>, then a newline, then the story prose. For no current-scene elapsed time, begin with <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. A clock check, dialogue beat, plan, memory, dream, flashback, or hypothetical is none. Never mention this protocol in the story prose.
-# EXACT SHAPE
+CHRONICLE OUTPUT FORMAT - REQUIRED
+First line exactly: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>
+If no present-scene time passed: <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>
+Then write story prose only. Do not mention this format.${reminder}
+Example:
 <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>
 Thirty minutes later, story prose continues here.
-</SYSTEM>
 ${CHRONICLE_SIGNAL_BLOCK_END}`;
   }
   function syncSignalInstructionForContext(context) {
@@ -1162,12 +1241,23 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
     const configuration = readChronicleConfiguration(context.storyCards.storyCards);
     const matchingCards = findChronicleStoryCardIndices(context.storyCards.storyCards);
     if (!force && configuration.repairChronicleCard !== true && matchingCards.length < 2) return;
-    const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard });
+    const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard }, readSignalDiagnostic(context.state));
     if (sync.status === "duplicate-detected") {
       context.state[CHRONICLE_RUNTIME_ERROR_KEY] = DUPLICATE_CARD_ERROR;
     } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === DUPLICATE_CARD_ERROR) {
       delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
     }
+  }
+  function readSignalDiagnostic(state) {
+    const value = state[CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY];
+    return isChronicleSignalDiagnostic(value) ? value : void 0;
+  }
+  function writeSignalDiagnostic(state, diagnostic) {
+    state[CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY] = Object.freeze({ ...diagnostic });
+  }
+  function previousSignalWasAbsent(state) {
+    var _a;
+    return ((_a = readSignalDiagnostic(state)) == null ? void 0 : _a.outputSignalStatus) === "absent";
   }
   function read(state) {
     const value = state[CHRONICLE_RUNTIME_STATE_KEY];

@@ -179,14 +179,36 @@ export function matchesActivity(text: string, activity: string): boolean {
 }
 
 function findExplicitDuration(text: string): ElapsedTime | undefined {
-  const match = /(?:(?:after|for|during|over|within|depois de|após|durante|por)\s+)(\d+)\s*(segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)|(\d+)\s*(segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)\s*(?:later|passed|passaram)/.exec(text);
+  const halfHour = /(?:(?:after|for|during|over|within)\s+(?:exactly\s+)?half an hour|half an hour\s+later)/.test(text);
+  if (halfHour) return createElapsedTime({ days: 0, hours: 0, minutes: 30, seconds: 0 });
+
+  const number = "(?:\\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\\s]+(?:one|two|three|four|five|six|seven|eight|nine))?";
+  const unit = "(?:segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?)";
+  const match = new RegExp(`(?:(?:after|for|during|over|within)\\s+(?:exactly\\s+|about\\s+|approximately\\s+)?(${number})\\s*(${unit})|(?:depois de|após|durante|por)\\s+(\\d+)\\s*(${unit})|(${number})\\s*(${unit})\\s*(?:later|passed|passaram))`).exec(text);
   if (match === null) return undefined;
-  const value = Number(match[1] ?? match[3]);
-  const unit = match[2] ?? match[4];
-  if (/^(segundos?|seconds?)$/.test(unit)) return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: value });
-  if (/^(minutos?|minutes?)$/.test(unit)) return createElapsedTime({ days: 0, hours: 0, minutes: value, seconds: 0 });
-  if (/^(horas?|hours?)$/.test(unit)) return createElapsedTime({ days: 0, hours: value, minutes: 0, seconds: 0 });
+  const value = parseNarrativeNumber(match[1] ?? match[3] ?? match[5]);
+  const durationUnit = match[2] ?? match[4] ?? match[6];
+  if (value === undefined || durationUnit === undefined) return undefined;
+  if (/^(segundos?|seconds?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: value });
+  if (/^(minutos?|minutes?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: 0, minutes: value, seconds: 0 });
+  if (/^(horas?|hours?)$/.test(durationUnit)) return createElapsedTime({ days: 0, hours: value, minutes: 0, seconds: 0 });
   return createElapsedTime({ days: value, hours: 0, minutes: 0, seconds: 0 });
+}
+
+function parseNarrativeNumber(value: string): number | undefined {
+  if (/^\d+$/.test(value)) return Number(value);
+  const parts = value.toLowerCase().split(/[\s-]+/);
+  const values: Readonly<Record<string, number>> = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+    ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+    seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+    sixty: 60, seventy: 70, eighty: 80, ninety: 90
+  };
+  if (parts.length === 1) return values[parts[0]];
+  if (parts.length === 2 && values[parts[0]] !== undefined && values[parts[0]] >= 20 && values[parts[1]] !== undefined && values[parts[1]] < 10) {
+    return values[parts[0]] + values[parts[1]];
+  }
+  return undefined;
 }
 
 function findTransitionHour(text: string): number | undefined {

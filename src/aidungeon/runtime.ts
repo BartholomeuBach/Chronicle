@@ -14,6 +14,7 @@ import { initializeChronicleState } from "../chronicle/state/initialize-chronicl
 import { isNormalizedGregorianDateTime } from "../chronicle/calendar/normalize-gregorian-date-time.js";
 import { MAX_PROCESSED_BEAT_IDS } from "../chronicle/state/apply-temporal-decision.js";
 import { CHRONICLE_NOTIFICATION_STATE_KEY, renderChronicleTimeNotification } from "./chronicle-time-notification.js";
+import { CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY, isChronicleSignalDiagnostic, type ChronicleSignalDiagnostic } from "./chronicle-signal-diagnostic.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
@@ -89,13 +90,24 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       }
       const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
       const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
+      const protocolAlreadyPresent = text.includes(CHRONICLE_SIGNAL_BLOCK_START);
+      const reminderIncluded = configuration.aiTemporalSignal && !protocolAlreadyPresent && previousSignalWasAbsent(context.state);
       const additions = [
         text.includes(projection) ? undefined : projection,
-        configuration.aiTemporalSignal && !text.includes(CHRONICLE_SIGNAL_BLOCK_START) ? chronicleSignalInstructionBlock() : undefined
+        configuration.aiTemporalSignal && !protocolAlreadyPresent ? chronicleSignalInstructionBlock(reminderIncluded) : undefined
       ].filter((value): value is string => value !== undefined);
-      if (additions.length === 0) return nonEmptyText(text);
+      if (additions.length === 0) {
+        if (configuration.aiTemporalSignal && protocolAlreadyPresent) writeSignalDiagnostic(context.state, { protocolStatus: "already-present", reminderIncluded, outputSignalStatus: readSignalDiagnostic(context.state)?.outputSignalStatus });
+        return nonEmptyText(text);
+      }
       const appended = additions.join("\n");
-      if (context.maxChars !== undefined && text.length + appended.length + 1 > context.maxChars) return nonEmptyText(text);
+      if (context.maxChars !== undefined && text.length + appended.length + 1 > context.maxChars) {
+        if (configuration.aiTemporalSignal) {
+          writeSignalDiagnostic(context.state, { protocolStatus: "omitted-context-limit", reminderIncluded, outputSignalStatus: readSignalDiagnostic(context.state)?.outputSignalStatus });
+        }
+        return nonEmptyText(text);
+      }
+      if (configuration.aiTemporalSignal) writeSignalDiagnostic(context.state, { protocolStatus: "appended", reminderIncluded });
       // Cache-efficient AI Dungeon models only accept additions after the
       // already-built context. Both the clock and the temporal protocol are
       // deliberately appended as one compact, fresh block.
@@ -116,6 +128,14 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
         const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
         const activeReasoner = configuration.aiTemporalSignal ? (hybridReasoner ?? reasoner) : reasoner;
         const decision = activeReasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
+        if (configuration.aiTemporalSignal) {
+          const previousDiagnostic = readSignalDiagnostic(context.state);
+          writeSignalDiagnostic(context.state, {
+            protocolStatus: previousDiagnostic?.protocolStatus ?? "not-observed",
+            reminderIncluded: previousDiagnostic?.reminderIncluded ?? false,
+            outputSignalStatus: decision.signalStatus ?? "absent"
+          });
+        }
         const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
         if (recorded.rejectionReason === "unsupported-range") {
           context.state[CHRONICLE_RUNTIME_ERROR_KEY] = UNSUPPORTED_RANGE_ERROR;
@@ -152,8 +172,12 @@ const CHRONICLE_SIGNAL_BLOCK_END = "[[chronicle:ai-signal-instruction:end]]";
  * solve the "mixed beat" case documented in 05_known_limitations.md. Whether
  * the narrator reliably follows this is unvalidated (Phase 8).
  */
-function chronicleSignalInstructionBlock(): string {
+function chronicleSignalInstructionBlock(reminderIncluded: boolean): string {
+  const reminder = reminderIncluded ? "\nThe previous reply omitted this required tag. Do not omit it again." : "";
+  return `${CHRONICLE_SIGNAL_BLOCK_START}\nCHRONICLE OUTPUT FORMAT - REQUIRED\nFirst line exactly: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>\nIf no present-scene time passed: <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>\nThen write story prose only. Do not mention this format.${reminder}\nExample:\n<<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>\nThirty minutes later, story prose continues here.\n${CHRONICLE_SIGNAL_BLOCK_END}`;
+  /* Legacy verbose protocol retained in source history only.
   return `${CHRONICLE_SIGNAL_BLOCK_START}\n<SYSTEM>\n# CHRONICLE TEMPORAL REPORT — REQUIRED OUTPUT HEADER\nBegin the response with exactly one header: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>, then a newline, then the story prose. For no current-scene elapsed time, begin with <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. A clock check, dialogue beat, plan, memory, dream, flashback, or hypothetical is none. Never mention this protocol in the story prose.\n# EXACT SHAPE\n<<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>\nThirty minutes later, story prose continues here.\n</SYSTEM>\n${CHRONICLE_SIGNAL_BLOCK_END}`;
+  */
 }
 
 /**
@@ -229,7 +253,7 @@ function syncProjection(context: AIDungeonHookContext, current: ChroniclePersist
   const configuration = readChronicleConfiguration(context.storyCards.storyCards);
   const matchingCards = findChronicleStoryCardIndices(context.storyCards.storyCards);
   if (!force && configuration.repairChronicleCard !== true && matchingCards.length < 2) return;
-  const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard });
+  const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard }, readSignalDiagnostic(context.state));
   if (sync.status === "duplicate-detected") {
     context.state[CHRONICLE_RUNTIME_ERROR_KEY] = DUPLICATE_CARD_ERROR;
   } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === DUPLICATE_CARD_ERROR) {
@@ -237,6 +261,19 @@ function syncProjection(context: AIDungeonHookContext, current: ChroniclePersist
     // only remove an error this exact code path is known to have set.
     delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
   }
+}
+
+function readSignalDiagnostic(state: Record<string, unknown>): ChronicleSignalDiagnostic | undefined {
+  const value = state[CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY];
+  return isChronicleSignalDiagnostic(value) ? value : undefined;
+}
+
+function writeSignalDiagnostic(state: Record<string, unknown>, diagnostic: ChronicleSignalDiagnostic): void {
+  state[CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY] = Object.freeze({ ...diagnostic });
+}
+
+function previousSignalWasAbsent(state: Record<string, unknown>): boolean {
+  return readSignalDiagnostic(state)?.outputSignalStatus === "absent";
 }
 
 function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {

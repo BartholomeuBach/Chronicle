@@ -60,6 +60,20 @@ describe("Chronicle Story Card projection", () => {
     });
   });
 
+  it("projects operational signal diagnostics into Notes without exposing the protocol", () => {
+    const recorded = ledgerWithOneRecord();
+    const notes = JSON.parse(createChronicleStoryCardProjection(recorded.state, recorded.ledger, {
+      protocolStatus: "appended",
+      reminderIncluded: true,
+      outputSignalStatus: "absent"
+    }).notes);
+    expect(notes.chronicleSignalDiagnostic).toEqual({
+      protocolStatus: "appended",
+      reminderIncluded: true,
+      outputSignalStatus: "absent"
+    });
+  });
+
   it("finds only the dedicated Chronicle card, by legacy keys", () => {
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle", entry: "", type: "story" }])).toBeUndefined();
     expect(findChronicleStoryCardIndex([{ keys: "other, chronicle-temporal-state", entry: "", type: "story" }])).toBe(0);
