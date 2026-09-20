@@ -60,15 +60,16 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
     runtime.onInput("I listen for movement.", { state, actionCount: 1, storyCards });
     const bootstrap = runtime.onContext("Current assembled context.", { state, storyCards, history: [{ text: "It was deep in the night.", type: "story" }] });
-    expect(bootstrap).toContain("CHRONICLE INITIAL CLOCK - REQUIRED");
+    expect(bootstrap).toMatch(/<<chronicle:start:\s*$/);
     expect(bootstrap).not.toContain("Current story time:");
-    const result = runtime.onOutput("<<chronicle:start:02:15,high>>\nA cold wind moves through the alley.", { state, actionCount: 1, storyCards });
+    const result = runtime.onOutput("02:15,high>>\nA cold wind moves through the alley.", { state, actionCount: 1, storyCards });
     expect(result).toBe("A cold wind moves through the alley.");
     const runtimeState = state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number; minute: number } } };
     expect(runtimeState.chronicleState.currentDateTime).toMatchObject({ hour: 2, minute: 15 });
     expect(cards[1].description).toContain("\"source\": \"model-signal\"");
     expect(cards[1].description).toContain("\"bootstrapInstructionStatus\": \"appended\"");
     expect(cards[1].description).toContain("\"bootstrapSignalStatus\": \"accepted\"");
+    expect(cards[1].description).toContain("\"bootstrapProtocolVariant\": \"prefill\"");
     expect(cards[1].description).toContain("\"contextCue\": \"Deep-night cue.\"");
   });
 

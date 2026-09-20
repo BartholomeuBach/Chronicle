@@ -108,10 +108,10 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
           current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
           context.state[CHRONICLE_RUNTIME_STATE_KEY] = current;
         } else {
-        writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended" }));
+        writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended", bootstrapProtocolVariant: "prefill" }));
         const bootstrap = chronicleInitialClockInstructionBlock();
         if (context.maxChars !== undefined && text.length + bootstrap.length + 1 > context.maxChars) {
-          writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested" }));
+          writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested", bootstrapProtocolVariant: "prefill" }));
           return nonEmptyText(text);
         }
         return nonEmptyText(`${text}\n${bootstrap}`);
@@ -212,7 +212,7 @@ function chronicleSignalInstructionBlock(reminderIncluded: boolean): string {
 }
 
 function chronicleInitialClockInstructionBlock(): string {
-  return "[[chronicle:initial-clock:start]]\nCHRONICLE INITIAL CLOCK - REQUIRED\nBefore story prose, emit exactly one first line: <<chronicle:start:HH:MM,high|medium|low>>. Use only the current scenario's opening time-of-day evidence. If the opening gives no defensible time, emit <<chronicle:start:none>>. Then write story prose only.\nExample:\n<<chronicle:start:02:00,high>>\nThe rain taps against the window.\n[[chronicle:initial-clock:end]]";
+  return "CHRONICLE INITIAL CLOCK\nComplete the control line below before story prose. Write only HH:MM,high|medium|low, then >>, then a newline and story prose. Use only the opening scenario's time-of-day evidence. If uncertain, write none,high>>.\n<<chronicle:start:";
 }
 
 /**
@@ -340,7 +340,8 @@ function resolveInitialClockCalibration(state: Record<string, unknown>, narrativ
     pending: false,
     contextCue: existing.contextCue ?? fallback.evidence,
     bootstrapInstructionStatus: existing.bootstrapInstructionStatus ?? "not-requested",
-    bootstrapSignalStatus: model.status
+    bootstrapSignalStatus: model.status,
+    bootstrapProtocolVariant: existing.bootstrapProtocolVariant ?? "header"
   });
   writeInitialClockCalibration(state, resolved);
   return resolved;

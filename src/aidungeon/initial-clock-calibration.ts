@@ -5,6 +5,7 @@ export const CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY = "chronicleInitialCl
 export type InitialClockCalibrationSource = "model-signal" | "scenario-context-rule" | "automatic-clock";
 export type InitialBootstrapInstructionStatus = "appended" | "omitted-context-limit" | "not-requested";
 export type InitialBootstrapSignalStatus = "accepted" | "absent" | "malformed" | "not-requested";
+export type InitialBootstrapProtocolVariant = "header" | "prefill";
 
 export interface InitialClockCalibration {
   readonly pending: boolean;
@@ -15,6 +16,7 @@ export interface InitialClockCalibration {
   readonly contextCue?: string;
   readonly bootstrapInstructionStatus?: InitialBootstrapInstructionStatus;
   readonly bootstrapSignalStatus?: InitialBootstrapSignalStatus;
+  readonly bootstrapProtocolVariant?: InitialBootstrapProtocolVariant;
 }
 
 export function createPendingInitialClockCalibration(): InitialClockCalibration {
@@ -30,7 +32,8 @@ export function isInitialClockCalibration(value: unknown): value is InitialClock
     typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59) &&
     (candidate.contextCue === undefined || typeof candidate.contextCue === "string") &&
     (candidate.bootstrapInstructionStatus === undefined || isInstructionStatus(candidate.bootstrapInstructionStatus)) &&
-    (candidate.bootstrapSignalStatus === undefined || isSignalStatus(candidate.bootstrapSignalStatus));
+    (candidate.bootstrapSignalStatus === undefined || isSignalStatus(candidate.bootstrapSignalStatus)) &&
+    (candidate.bootstrapProtocolVariant === undefined || candidate.bootstrapProtocolVariant === "header" || candidate.bootstrapProtocolVariant === "prefill");
 }
 
 export function inferInitialClockFromContext(context: string, automatic: ChronicleDateTime): InitialClockCalibration {
@@ -52,7 +55,7 @@ export function inspectInitialClockSignal(text: string): { readonly status: Init
   let latest: string | undefined;
   let directive: RegExpExecArray | null;
   while ((directive = pattern.exec(text)) !== null) latest = directive[1];
-  if (latest === undefined) return Object.freeze({ status: "absent" });
+  if (latest === undefined) return inspectInitialClockPrefill(text);
   const raw = latest.replace(/\s+/g, "");
   if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return Object.freeze({ status: "absent" });
   const parsed = /^(?:([01]?\d|2[0-3]):([0-5]\d))(?:,(high|medium|low))?$/i.exec(raw);
@@ -61,7 +64,7 @@ export function inspectInitialClockSignal(text: string): { readonly status: Init
 }
 
 export function stripInitialClockSignal(text: string): string {
-  return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/[ \t]{2,}/g, " ").trim();
+  return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*\d{1,2}:\d{2}(?:,(?:high|medium|low))?>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
 }
 
 export function applyInitialClockCalibration(dateTime: ChronicleDateTime, calibration: InitialClockCalibration): ChronicleDateTime {
@@ -111,4 +114,14 @@ function isInstructionStatus(value: unknown): value is InitialBootstrapInstructi
 
 function isSignalStatus(value: unknown): value is InitialBootstrapSignalStatus {
   return value === "accepted" || value === "absent" || value === "malformed" || value === "not-requested";
+}
+
+/** Accepts the completion of a Context suffix ending in `<<chronicle:start:`. */
+function inspectInitialClockPrefill(text: string): { readonly status: InitialBootstrapSignalStatus; readonly calibration?: InitialClockCalibration } {
+  const parsed = /^\s*([01]?\d|2[0-3]):([0-5]\d)(?:,(high|medium|low))?>>/i.exec(text);
+  if (parsed !== null) {
+    return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap prefill (${(parsed[3] ?? "medium").toLowerCase()} confidence).`) });
+  }
+  if (/^\s*\d{1,2}:\d{2}(?:,[a-z]+)?>>/i.test(text)) return Object.freeze({ status: "malformed" });
+  return Object.freeze({ status: "absent" });
 }

@@ -1102,7 +1102,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     const candidate = value;
     if (typeof candidate.pending !== "boolean") return false;
     if (candidate.source === void 0) return candidate.pending;
-    return (candidate.source === "model-signal" || candidate.source === "scenario-context-rule" || candidate.source === "automatic-clock") && typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59) && (candidate.contextCue === void 0 || typeof candidate.contextCue === "string") && (candidate.bootstrapInstructionStatus === void 0 || isInstructionStatus(candidate.bootstrapInstructionStatus)) && (candidate.bootstrapSignalStatus === void 0 || isSignalStatus2(candidate.bootstrapSignalStatus));
+    return (candidate.source === "model-signal" || candidate.source === "scenario-context-rule" || candidate.source === "automatic-clock") && typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59) && (candidate.contextCue === void 0 || typeof candidate.contextCue === "string") && (candidate.bootstrapInstructionStatus === void 0 || isInstructionStatus(candidate.bootstrapInstructionStatus)) && (candidate.bootstrapSignalStatus === void 0 || isSignalStatus2(candidate.bootstrapSignalStatus)) && (candidate.bootstrapProtocolVariant === void 0 || candidate.bootstrapProtocolVariant === "header" || candidate.bootstrapProtocolVariant === "prefill");
   }
   function inferInitialClockFromContext(context, automatic) {
     const text = context.toLowerCase();
@@ -1118,7 +1118,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     let latest;
     let directive;
     while ((directive = pattern.exec(text)) !== null) latest = directive[1];
-    if (latest === void 0) return Object.freeze({ status: "absent" });
+    if (latest === void 0) return inspectInitialClockPrefill(text);
     const raw = latest.replace(/\s+/g, "");
     if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return Object.freeze({ status: "absent" });
     const parsed = /^(?:([01]?\d|2[0-3]):([0-5]\d))(?:,(high|medium|low))?$/i.exec(raw);
@@ -1126,7 +1126,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${((_a = parsed[3]) != null ? _a : "medium").toLowerCase()} confidence).`) });
   }
   function stripInitialClockSignal(text) {
-    return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/[ \t]{2,}/g, " ").trim();
+    return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*\d{1,2}:\d{2}(?:,(?:high|medium|low))?>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
   }
   function applyInitialClockCalibration(dateTime, calibration) {
     if (calibration.hour === void 0 || calibration.minute === void 0) return dateTime;
@@ -1171,6 +1171,15 @@ Story time: ${formatChronicleDateTime(next)}.`;
   function isSignalStatus2(value) {
     return value === "accepted" || value === "absent" || value === "malformed" || value === "not-requested";
   }
+  function inspectInitialClockPrefill(text) {
+    var _a;
+    const parsed = /^\s*([01]?\d|2[0-3]):([0-5]\d)(?:,(high|medium|low))?>>/i.exec(text);
+    if (parsed !== null) {
+      return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap prefill (${((_a = parsed[3]) != null ? _a : "medium").toLowerCase()} confidence).`) });
+    }
+    if (/^\s*\d{1,2}:\d{2}(?:,[a-z]+)?>>/i.test(text)) return Object.freeze({ status: "malformed" });
+    return Object.freeze({ status: "absent" });
+  }
 
   // src/aidungeon/runtime.ts
   var CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
@@ -1214,10 +1223,10 @@ Story time: ${formatChronicleDateTime(next)}.`;
             current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
             context.state[CHRONICLE_RUNTIME_STATE_KEY] = current;
           } else {
-            writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended" }));
+            writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended", bootstrapProtocolVariant: "prefill" }));
             const bootstrap = chronicleInitialClockInstructionBlock();
             if (context.maxChars !== void 0 && text.length + bootstrap.length + 1 > context.maxChars) {
-              writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested" }));
+              writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested", bootstrapProtocolVariant: "prefill" }));
               return nonEmptyText(text);
             }
             return nonEmptyText(`${text}
@@ -1302,7 +1311,7 @@ Thirty minutes later, story prose continues here.
 ${CHRONICLE_SIGNAL_BLOCK_END}`;
   }
   function chronicleInitialClockInstructionBlock() {
-    return "[[chronicle:initial-clock:start]]\nCHRONICLE INITIAL CLOCK - REQUIRED\nBefore story prose, emit exactly one first line: <<chronicle:start:HH:MM,high|medium|low>>. Use only the current scenario's opening time-of-day evidence. If the opening gives no defensible time, emit <<chronicle:start:none>>. Then write story prose only.\nExample:\n<<chronicle:start:02:00,high>>\nThe rain taps against the window.\n[[chronicle:initial-clock:end]]";
+    return "CHRONICLE INITIAL CLOCK\nComplete the control line below before story prose. Write only HH:MM,high|medium|low, then >>, then a newline and story prose. Use only the opening scenario's time-of-day evidence. If uncertain, write none,high>>.\n<<chronicle:start:";
   }
   function syncSignalInstructionForContext(context) {
     const memory = context.state.memory;
@@ -1380,7 +1389,7 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
     state[CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY] = Object.freeze({ ...calibration });
   }
   function resolveInitialClockCalibration(state, narrative, automaticDateTime) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const existing = readInitialClockCalibration(state);
     if ((existing == null ? void 0 : existing.pending) !== true) return void 0;
     const model = inspectInitialClockSignal(narrative);
@@ -1390,7 +1399,8 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
       pending: false,
       contextCue: (_b = existing.contextCue) != null ? _b : fallback.evidence,
       bootstrapInstructionStatus: (_c = existing.bootstrapInstructionStatus) != null ? _c : "not-requested",
-      bootstrapSignalStatus: model.status
+      bootstrapSignalStatus: model.status,
+      bootstrapProtocolVariant: (_d = existing.bootstrapProtocolVariant) != null ? _d : "header"
     });
     writeInitialClockCalibration(state, resolved);
     return resolved;

@@ -34,6 +34,8 @@ describe("initial clock calibration", () => {
     expect(readInitialClockSignal("<<chronicle:start:none>>\nStory.")).toBeUndefined();
     expect(readInitialClockSignal("<<chronicle:start:31:99>>\nStory.")).toBeUndefined();
     expect(stripInitialClockSignal("<<chronicle:start:02:15,high>>\nStory.")).toBe("Story.");
+    expect(readInitialClockSignal("02:15,high>>\nStory.")).toMatchObject({ source: "model-signal", hour: 2, minute: 15 });
+    expect(stripInitialClockSignal("02:15,high>>\nStory.")).toBe("Story.");
     expect(inspectInitialClockSignal("Story only.")).toMatchObject({ status: "absent" });
     expect(inspectInitialClockSignal("<<chronicle:start:25:00>>")).toMatchObject({ status: "malformed" });
   });
