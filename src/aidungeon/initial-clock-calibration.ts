@@ -3,6 +3,8 @@ import type { ChronicleDateTime } from "../chronicle/state/chronicle-state.js";
 export const CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY = "chronicleInitialClockCalibration";
 
 export type InitialClockCalibrationSource = "model-signal" | "scenario-context-rule" | "automatic-clock";
+export type InitialBootstrapInstructionStatus = "appended" | "omitted-context-limit" | "not-requested";
+export type InitialBootstrapSignalStatus = "accepted" | "absent" | "malformed" | "not-requested";
 
 export interface InitialClockCalibration {
   readonly pending: boolean;
@@ -10,6 +12,9 @@ export interface InitialClockCalibration {
   readonly evidence?: string;
   readonly hour?: number;
   readonly minute?: number;
+  readonly contextCue?: string;
+  readonly bootstrapInstructionStatus?: InitialBootstrapInstructionStatus;
+  readonly bootstrapSignalStatus?: InitialBootstrapSignalStatus;
 }
 
 export function createPendingInitialClockCalibration(): InitialClockCalibration {
@@ -22,7 +27,10 @@ export function isInitialClockCalibration(value: unknown): value is InitialClock
   if (typeof candidate.pending !== "boolean") return false;
   if (candidate.source === undefined) return candidate.pending;
   return (candidate.source === "model-signal" || candidate.source === "scenario-context-rule" || candidate.source === "automatic-clock") &&
-    typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59);
+    typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59) &&
+    (candidate.contextCue === undefined || typeof candidate.contextCue === "string") &&
+    (candidate.bootstrapInstructionStatus === undefined || isInstructionStatus(candidate.bootstrapInstructionStatus)) &&
+    (candidate.bootstrapSignalStatus === undefined || isSignalStatus(candidate.bootstrapSignalStatus));
 }
 
 export function inferInitialClockFromContext(context: string, automatic: ChronicleDateTime): InitialClockCalibration {
@@ -36,16 +44,20 @@ export function inferInitialClockFromContext(context: string, automatic: Chronic
 }
 
 export function readInitialClockSignal(text: string): InitialClockCalibration | undefined {
+  return inspectInitialClockSignal(text).calibration;
+}
+
+export function inspectInitialClockSignal(text: string): { readonly status: InitialBootstrapSignalStatus; readonly calibration?: InitialClockCalibration } {
   const pattern = /<<chronicle:start:([^>]{1,24})>>/gi;
   let latest: string | undefined;
   let directive: RegExpExecArray | null;
   while ((directive = pattern.exec(text)) !== null) latest = directive[1];
-  if (latest === undefined) return undefined;
+  if (latest === undefined) return Object.freeze({ status: "absent" });
   const raw = latest.replace(/\s+/g, "");
-  if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return undefined;
+  if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return Object.freeze({ status: "absent" });
   const parsed = /^(?:([01]?\d|2[0-3]):([0-5]\d))(?:,(high|medium|low))?$/i.exec(raw);
-  if (parsed === null) return undefined;
-  return complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${(parsed[3] ?? "medium").toLowerCase()} confidence).`);
+  if (parsed === null) return Object.freeze({ status: "malformed" });
+  return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${(parsed[3] ?? "medium").toLowerCase()} confidence).`) });
 }
 
 export function stripInitialClockSignal(text: string): string {
@@ -91,4 +103,12 @@ const INITIAL_TIME_CUES: readonly { readonly pattern: RegExp; readonly hour: num
 
 function isClockPart(value: unknown, maximum: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= maximum;
+}
+
+function isInstructionStatus(value: unknown): value is InitialBootstrapInstructionStatus {
+  return value === "appended" || value === "omitted-context-limit" || value === "not-requested";
+}
+
+function isSignalStatus(value: unknown): value is InitialBootstrapSignalStatus {
+  return value === "accepted" || value === "absent" || value === "malformed" || value === "not-requested";
 }

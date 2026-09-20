@@ -20,8 +20,8 @@ import {
   applyInitialClockCalibration,
   createPendingInitialClockCalibration,
   inferInitialClockFromContext,
+  inspectInitialClockSignal,
   isInitialClockCalibration,
-  readInitialClockSignal,
   stripInitialClockSignal,
   type InitialClockCalibration
 } from "./initial-clock-calibration.js";
@@ -103,13 +103,16 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       if (initialCalibration?.pending === true) {
         const fallback = inferInitialClockFromContext(text, current.chronicleState.currentDateTime);
         if (!configuration.aiTemporalSignal) {
-          writeInitialClockCalibration(context.state, fallback);
+          writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, contextCue: fallback.evidence, bootstrapInstructionStatus: "not-requested", bootstrapSignalStatus: "not-requested" }));
           current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
           context.state[CHRONICLE_RUNTIME_STATE_KEY] = current;
         } else {
-        writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true }));
+        writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended" }));
         const bootstrap = chronicleInitialClockInstructionBlock();
-        if (context.maxChars !== undefined && text.length + bootstrap.length + 1 > context.maxChars) return nonEmptyText(text);
+        if (context.maxChars !== undefined && text.length + bootstrap.length + 1 > context.maxChars) {
+          writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested" }));
+          return nonEmptyText(text);
+        }
         return nonEmptyText(`${text}\n${bootstrap}`);
         }
       }
@@ -150,11 +153,12 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       if (current === undefined || reasoner === undefined) return nonEmptyText(safeText);
       try {
         const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
+        const bootstrapPending = readInitialClockCalibration(context.state)?.pending === true;
         const calibration = resolveInitialClockCalibration(context.state, text, current.chronicleState.currentDateTime);
         const calibratedState = calibration === undefined ? current.chronicleState : Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, calibration) });
         const activeReasoner = configuration.aiTemporalSignal ? (hybridReasoner ?? reasoner) : reasoner;
         const decision = activeReasoner.decide({ currentState: calibratedState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
-        if (configuration.aiTemporalSignal) {
+        if (configuration.aiTemporalSignal && !bootstrapPending) {
           const previousDiagnostic = readSignalDiagnostic(context.state);
           writeSignalDiagnostic(context.state, {
             protocolStatus: previousDiagnostic?.protocolStatus ?? "not-observed",
@@ -318,9 +322,15 @@ function writeInitialClockCalibration(state: Record<string, unknown>, calibratio
 function resolveInitialClockCalibration(state: Record<string, unknown>, narrative: string, automaticDateTime: ChronicleState["currentDateTime"]): InitialClockCalibration | undefined {
   const existing = readInitialClockCalibration(state);
   if (existing?.pending !== true) return undefined;
-  const model = readInitialClockSignal(narrative);
+  const model = inspectInitialClockSignal(narrative);
   const fallback = existing.source === undefined ? inferInitialClockFromContext("", automaticDateTime) : Object.freeze({ ...existing, pending: false });
-  const resolved = model ?? fallback;
+  const resolved = Object.freeze({
+    ...(model.calibration ?? fallback),
+    pending: false,
+    contextCue: existing.contextCue ?? fallback.evidence,
+    bootstrapInstructionStatus: existing.bootstrapInstructionStatus ?? "not-requested",
+    bootstrapSignalStatus: model.status
+  });
   writeInitialClockCalibration(state, resolved);
   return resolved;
 }

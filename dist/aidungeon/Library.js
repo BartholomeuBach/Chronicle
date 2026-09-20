@@ -1102,7 +1102,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     const candidate = value;
     if (typeof candidate.pending !== "boolean") return false;
     if (candidate.source === void 0) return candidate.pending;
-    return (candidate.source === "model-signal" || candidate.source === "scenario-context-rule" || candidate.source === "automatic-clock") && typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59);
+    return (candidate.source === "model-signal" || candidate.source === "scenario-context-rule" || candidate.source === "automatic-clock") && typeof candidate.evidence === "string" && isClockPart(candidate.hour, 23) && isClockPart(candidate.minute, 59) && (candidate.contextCue === void 0 || typeof candidate.contextCue === "string") && (candidate.bootstrapInstructionStatus === void 0 || isInstructionStatus(candidate.bootstrapInstructionStatus)) && (candidate.bootstrapSignalStatus === void 0 || isSignalStatus2(candidate.bootstrapSignalStatus));
   }
   function inferInitialClockFromContext(context, automatic) {
     const text = context.toLowerCase();
@@ -1112,18 +1112,18 @@ Story time: ${formatChronicleDateTime(next)}.`;
     if (matched !== void 0) return complete("scenario-context-rule", matched.hour, matched.minute, matched.evidence);
     return complete("automatic-clock", automatic.hour, automatic.minute, "No reliable time-of-day cue in scenario context.");
   }
-  function readInitialClockSignal(text) {
+  function inspectInitialClockSignal(text) {
     var _a;
     const pattern = /<<chronicle:start:([^>]{1,24})>>/gi;
     let latest;
     let directive;
     while ((directive = pattern.exec(text)) !== null) latest = directive[1];
-    if (latest === void 0) return void 0;
+    if (latest === void 0) return Object.freeze({ status: "absent" });
     const raw = latest.replace(/\s+/g, "");
-    if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return void 0;
+    if (/^none(?:,(?:high|medium|low))?$/i.test(raw)) return Object.freeze({ status: "absent" });
     const parsed = /^(?:([01]?\d|2[0-3]):([0-5]\d))(?:,(high|medium|low))?$/i.exec(raw);
-    if (parsed === null) return void 0;
-    return complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${((_a = parsed[3]) != null ? _a : "medium").toLowerCase()} confidence).`);
+    if (parsed === null) return Object.freeze({ status: "malformed" });
+    return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${((_a = parsed[3]) != null ? _a : "medium").toLowerCase()} confidence).`) });
   }
   function stripInitialClockSignal(text) {
     return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/[ \t]{2,}/g, " ").trim();
@@ -1165,6 +1165,12 @@ Story time: ${formatChronicleDateTime(next)}.`;
   function isClockPart(value, maximum) {
     return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= maximum;
   }
+  function isInstructionStatus(value) {
+    return value === "appended" || value === "omitted-context-limit" || value === "not-requested";
+  }
+  function isSignalStatus2(value) {
+    return value === "accepted" || value === "absent" || value === "malformed" || value === "not-requested";
+  }
 
   // src/aidungeon/runtime.ts
   var CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
@@ -1204,13 +1210,16 @@ Story time: ${formatChronicleDateTime(next)}.`;
         if ((initialCalibration == null ? void 0 : initialCalibration.pending) === true) {
           const fallback = inferInitialClockFromContext(text, current.chronicleState.currentDateTime);
           if (!configuration.aiTemporalSignal) {
-            writeInitialClockCalibration(context.state, fallback);
+            writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, contextCue: fallback.evidence, bootstrapInstructionStatus: "not-requested", bootstrapSignalStatus: "not-requested" }));
             current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
             context.state[CHRONICLE_RUNTIME_STATE_KEY] = current;
           } else {
-            writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true }));
+            writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "appended" }));
             const bootstrap = chronicleInitialClockInstructionBlock();
-            if (context.maxChars !== void 0 && text.length + bootstrap.length + 1 > context.maxChars) return nonEmptyText(text);
+            if (context.maxChars !== void 0 && text.length + bootstrap.length + 1 > context.maxChars) {
+              writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true, contextCue: fallback.evidence, bootstrapInstructionStatus: "omitted-context-limit", bootstrapSignalStatus: "not-requested" }));
+              return nonEmptyText(text);
+            }
             return nonEmptyText(`${text}
 ${bootstrap}`);
           }
@@ -1238,7 +1247,7 @@ ${bootstrap}`);
 ${appended}`);
       },
       onOutput(text, context) {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         clearChronicleNotification(context.state);
         ensureConfigurationCardForContext(context);
         syncSignalInstructionForContext(context);
@@ -1248,19 +1257,20 @@ ${appended}`);
         if (current === void 0 || reasoner === void 0) return nonEmptyText(safeText);
         try {
           const configuration = readChronicleConfiguration((_b = (_a = context.storyCards) == null ? void 0 : _a.storyCards) != null ? _b : []);
+          const bootstrapPending = ((_c = readInitialClockCalibration(context.state)) == null ? void 0 : _c.pending) === true;
           const calibration = resolveInitialClockCalibration(context.state, text, current.chronicleState.currentDateTime);
           const calibratedState = calibration === void 0 ? current.chronicleState : Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, calibration) });
           const activeReasoner = configuration.aiTemporalSignal ? hybridReasoner != null ? hybridReasoner : reasoner : reasoner;
           const decision2 = activeReasoner.decide({ currentState: calibratedState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
-          if (configuration.aiTemporalSignal) {
+          if (configuration.aiTemporalSignal && !bootstrapPending) {
             const previousDiagnostic = readSignalDiagnostic(context.state);
             writeSignalDiagnostic(context.state, {
-              protocolStatus: (_c = previousDiagnostic == null ? void 0 : previousDiagnostic.protocolStatus) != null ? _c : "not-observed",
-              reminderIncluded: (_d = previousDiagnostic == null ? void 0 : previousDiagnostic.reminderIncluded) != null ? _d : false,
-              outputSignalStatus: (_e = decision2.signalStatus) != null ? _e : "absent"
+              protocolStatus: (_d = previousDiagnostic == null ? void 0 : previousDiagnostic.protocolStatus) != null ? _d : "not-observed",
+              reminderIncluded: (_e = previousDiagnostic == null ? void 0 : previousDiagnostic.reminderIncluded) != null ? _e : false,
+              outputSignalStatus: (_f = decision2.signalStatus) != null ? _f : "absent"
             });
           }
-          const recorded = recordTemporalDecision({ state: calibratedState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision: decision2, actionInterpretation: decision2.rationale, confidence: (_f = decision2.confidence) != null ? _f : "low" });
+          const recorded = recordTemporalDecision({ state: calibratedState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision: decision2, actionInterpretation: decision2.rationale, confidence: (_g = decision2.confidence) != null ? _g : "low" });
           if (recorded.rejectionReason === "unsupported-range") {
             context.state[CHRONICLE_RUNTIME_ERROR_KEY] = UNSUPPORTED_RANGE_ERROR;
           } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === UNSUPPORTED_RANGE_ERROR) {
@@ -1362,11 +1372,18 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
     state[CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY] = Object.freeze({ ...calibration });
   }
   function resolveInitialClockCalibration(state, narrative, automaticDateTime) {
+    var _a, _b, _c;
     const existing = readInitialClockCalibration(state);
     if ((existing == null ? void 0 : existing.pending) !== true) return void 0;
-    const model = readInitialClockSignal(narrative);
+    const model = inspectInitialClockSignal(narrative);
     const fallback = existing.source === void 0 ? inferInitialClockFromContext("", automaticDateTime) : Object.freeze({ ...existing, pending: false });
-    const resolved = model != null ? model : fallback;
+    const resolved = Object.freeze({
+      ...(_a = model.calibration) != null ? _a : fallback,
+      pending: false,
+      contextCue: (_b = existing.contextCue) != null ? _b : fallback.evidence,
+      bootstrapInstructionStatus: (_c = existing.bootstrapInstructionStatus) != null ? _c : "not-requested",
+      bootstrapSignalStatus: model.status
+    });
     writeInitialClockCalibration(state, resolved);
     return resolved;
   }

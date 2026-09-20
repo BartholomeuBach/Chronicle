@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyInitialClockCalibration,
   inferInitialClockFromContext,
+  inspectInitialClockSignal,
   readInitialClockSignal,
   stripInitialClockSignal
 } from "../../src/aidungeon/initial-clock-calibration.js";
@@ -33,6 +34,8 @@ describe("initial clock calibration", () => {
     expect(readInitialClockSignal("<<chronicle:start:none>>\nStory.")).toBeUndefined();
     expect(readInitialClockSignal("<<chronicle:start:31:99>>\nStory.")).toBeUndefined();
     expect(stripInitialClockSignal("<<chronicle:start:02:15,high>>\nStory.")).toBe("Story.");
+    expect(inspectInitialClockSignal("Story only.")).toMatchObject({ status: "absent" });
+    expect(inspectInitialClockSignal("<<chronicle:start:25:00>>")).toMatchObject({ status: "malformed" });
   });
 
   it("changes only the time of the automatic date", () => {

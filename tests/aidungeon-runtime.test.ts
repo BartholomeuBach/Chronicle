@@ -67,6 +67,8 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     const runtimeState = state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number; minute: number } } };
     expect(runtimeState.chronicleState.currentDateTime).toMatchObject({ hour: 2, minute: 15 });
     expect(cards[1].description).toContain("\"source\": \"model-signal\"");
+    expect(cards[1].description).toContain("\"bootstrapInstructionStatus\": \"appended\"");
+    expect(cards[1].description).toContain("\"bootstrapSignalStatus\": \"accepted\"");
   });
 
   it("processes an Output through the configured Reasoner and refreshes the Story Card", () => {
