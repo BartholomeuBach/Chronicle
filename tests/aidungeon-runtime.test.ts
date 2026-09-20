@@ -114,6 +114,27 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(cards[1].description).toContain("Fifteen minutes passed.");
   });
 
+  it("does not charge time twice when Retry regenerates different prose for one actionCount", () => {
+    const state: Record<string, unknown> = {};
+    initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));
+    const cards: AiDungeonStoryCard[] = [configurationCard()];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+    const reasoner: TemporalReasoner = { decide: () => ({ elapsedTime: createElapsedTime({ days: 0, hours: 0, minutes: 15, seconds: 0 }), mode: "explicit-duration", rationale: "Fifteen minutes passed." }) };
+    const runtime = createChronicleRuntime(reasoner);
+
+    runtime.onInput("I wait.", { state, actionCount: 1, storyCards });
+    runtime.onOutput("Fifteen minutes pass beside the road.", { state, actionCount: 1, storyCards });
+    runtime.onOutput("A quarter hour passes while rain falls.", { state, actionCount: 1, storyCards });
+
+    const current = state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number; minute: number } }; ledger: { records: readonly unknown[] } };
+    expect(current.chronicleState.currentDateTime).toMatchObject({ hour: 19, minute: 47 });
+    expect(current.ledger.records).toHaveLength(1);
+  });
+
   it("does not let an unexpected Story Card sync failure crash the Context hook (defense in depth, 2026-09-16)", () => {
     const state: Record<string, unknown> = {};
     initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));

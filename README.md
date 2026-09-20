@@ -227,12 +227,21 @@ Chronicle uses a hierarchy of evidence:
 default), Chronicle asks the AI Dungeon narrator to report how much time it judges just passed,
 tagged with its own confidence. That report is checked against the same non-current-frame guard
 Chronicle's deterministic rules already use — a memory, dream, hypothetical, or quoted scene — and
-is trusted only if it doesn't contradict that check. Absent, malformed, or contradicted signals fall
-straight through to tier 1 and below, exactly as if the narrator had said nothing at all. Tiers 1-4
-are Chronicle's original deterministic rules, unchanged and always active as the fallback — they are
-what runs every single time tier 0 has nothing to say.
+is trusted only if it doesn't contradict that check. Malformed or contradicted signals fall through to
+the deterministic tiers. When a signal is absent, Chronicle still applies explicit narrative evidence
+and conservative rules, but deliberately withholds an activity-prior-only scene-progression advance:
+the narrator's missing report must not turn a weak prior into fictional elapsed time. With `AI Temporal
+Signal: false`, the deterministic reasoner runs on its own, including its normal activity-prior behavior.
 
 Narrative evidence always wins over rigid defaults.
+
+### What Chronicle guarantees — and what it estimates
+
+Chronicle guarantees a bounded persisted clock, bounded decision history, and at-most-once processing for an AI Dungeon action when `info.actionCount` is available. Its calendar arithmetic, Story Card projection, and fallback path are deterministic.
+
+It does **not** guarantee that a narrator follows the optional temporal-tag instruction or that a narrative phrase has only one possible real-world hour. Automatic initialization preserves its automatic date and estimates only the initial hour/minute: explicit clocks win, then ranked opening-scene cues (including figurative language such as dusk, long shadows, and blue hour), then the automatic clock. Treat that result as a sensible seed, not as recovered canonical lore.
+
+For the current live-test checklist, diagnostics, and known platform limitations, see [VALIDATION.md](./VALIDATION.md).
 
 ---
 

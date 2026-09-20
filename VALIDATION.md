@@ -14,6 +14,26 @@ This log records evidence observed in a real AI Dungeon Scenario. It is delibera
 | Model-visible clock | Passed | The narrator correctly answered a player request to read the computer's current date and time. |
 | Ledger write path | Passed | Live Notes contained accepted records with `before`, `elapsedTime`, `mode`, `confidence`, and `after`. |
 
+## Pre-beta review — 2026-09-19
+
+### Guarantees confirmed locally
+
+* The runtime state retains only the last 64 processed turn identities and the last 100 ledger records; the Story Card Notes project only the most recent 20 records. A long adventure therefore does not grow Chronicle's own persisted structures without bound.
+* A known `info.actionCount` is now the idempotency identity for an Output. Regenerating/Retrying a response for that same action cannot advance the clock a second time merely because the prose differs. When the platform omits `actionCount`, Chronicle falls back to a hash of the completed text; that fallback is less certain.
+* The four published artifacts are bundled separately, parse as standalone modifier scripts, and have passed the Script Test kernel path previously observed in AI Dungeon.
+
+### Heuristics, not guarantees
+
+* `AI Temporal Signal` is advisory. The Context instruction can be appended and the narrator can still omit or malform the tag. In either case Chronicle continues through deterministic rules; a missing narrator tag must never be interpreted as a broken clock.
+* Automatic initialization retains the automatic date, then chooses only an initial hour/minute. It prioritizes an explicit clock, then a ranked English cue from the scenario opening/history (including figurative cues such as dusk, long shadows, and blue hour), then the automatic clock. It cannot prove narrative intent: a time reference that is not the opening scene can still be a false positive.
+
+### Long-scenario observation checklist
+
+1. At turns 1, 10, 25, and after any Retry/Undo/reload, record the current card Entry plus the most recent Notes record.
+2. For a deliberate time skip, save the player action, narrator reply, and ledger record together; do the same for a clock check or short dialogue that should not advance time.
+3. If `chronicleSignalDiagnostic.outputSignalStatus` is repeatedly `absent`, leave the setting enabled only if the deterministic result remains useful; it is safe to set `AI Temporal Signal: false` to remove the unreliable prompt.
+4. Treat `chronicleRuntimeError`, duplicate cards, a missing projection, or a changed time after Retry as stop-and-capture events before continuing the test.
+
 ## Observed issue — temporal inference quality
 
 The live ledger recorded two fallback activity-prior decisions (`signalStatus: "absent"`):
@@ -28,12 +48,12 @@ The exact player-action/output transcript for each `beatId` must be captured bef
 ## Still to validate in AI Dungeon
 
 * Automatic initialization bootstrap: the first Context requests `<<chronicle:start:HH:MM,...>>` without exposing a provisional clock; the first Output should remove that tag, retain the automatic date, and use its hour/minute.
-* Automatic initialization fallback: when the bootstrap tag is absent, direct and figurative kickstart cues should choose a coherent clock; no cue should preserve the automatic hour/minute.
+* Automatic initialization fallback: when the bootstrap tag is absent, direct and figurative kickstart cues should choose a coherent clock; when no defensible cue exists, it should preserve the automatic hour/minute.
 * The narrator reliably emits the temporal protocol on ordinary turns.
 * Explicit time skips produce the specified delta.
 * Pure observations (checking a clock, reading a screen, looking around) remain at zero elapsed time.
 * Memory, dream, quotation, and hypothetical guards reject non-current time language.
-* Retry, Undo, reload, and Continue do not double-count a beat.
+* Undo, reload, and Continue do not double-count a beat in the live AI Dungeon lifecycle. Retry is now covered by a local regression test and still needs live confirmation.
 * `Chronicle Enabled: false` removes the narrator instruction and pauses updates.
 * `Repair Chronicle Card: true` repairs duplicate temporal-state cards.
 

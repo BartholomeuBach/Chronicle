@@ -390,7 +390,12 @@ function isValidRuntimeState(value: unknown): value is ChroniclePersistentRuntim
     (candidate.pendingPlayerAction === undefined || typeof candidate.pendingPlayerAction === "string");
 }
 function beatId(actionCount: number | undefined, text: string): string {
+  // AI Dungeon keeps actionCount stable when a player retries/regenerates the
+  // same action, while the narrator text naturally changes. Prefer that
+  // platform turn identity whenever it exists so Retry cannot charge time
+  // twice merely because it produced different prose.
+  if (typeof actionCount === "number" && Number.isFinite(actionCount)) return `action:${actionCount}`;
   let hash = 2_166_136_261;
   for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16_777_619);
-  return `${actionCount ?? "unknown"}:${(hash >>> 0).toString(16)}`;
+  return `output:${(hash >>> 0).toString(16)}`;
 }

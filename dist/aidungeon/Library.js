@@ -1450,9 +1450,10 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
     return candidate.schemaVersion === CHRONICLE_RUNTIME_SCHEMA_VERSION && dateTime !== void 0 && isNormalizedGregorianDateTime(dateTime) && Array.isArray((_b = candidate.chronicleState) == null ? void 0 : _b.processedBeatIds) && candidate.chronicleState.processedBeatIds.length <= MAX_PROCESSED_BEAT_IDS && candidate.chronicleState.processedBeatIds.every((id) => typeof id === "string" && id.trim().length > 0) && new Set(candidate.chronicleState.processedBeatIds).size === candidate.chronicleState.processedBeatIds.length && isTemporalLedger(candidate.ledger, dateTime) && (candidate.pendingPlayerAction === void 0 || typeof candidate.pendingPlayerAction === "string");
   }
   function beatId(actionCount, text) {
+    if (typeof actionCount === "number" && Number.isFinite(actionCount)) return `action:${actionCount}`;
     let hash = 2166136261;
     for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
-    return `${actionCount != null ? actionCount : "unknown"}:${(hash >>> 0).toString(16)}`;
+    return `output:${(hash >>> 0).toString(16)}`;
   }
 
   // src/aidungeon/library.ts
