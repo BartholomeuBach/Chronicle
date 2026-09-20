@@ -59,7 +59,7 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     };
     const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
     runtime.onInput("I listen for movement.", { state, actionCount: 1, storyCards });
-    const bootstrap = runtime.onContext("It was deep in the night.", { state, storyCards });
+    const bootstrap = runtime.onContext("Current assembled context.", { state, storyCards, history: [{ text: "It was deep in the night.", type: "story" }] });
     expect(bootstrap).toContain("CHRONICLE INITIAL CLOCK - REQUIRED");
     expect(bootstrap).not.toContain("Current story time:");
     const result = runtime.onOutput("<<chronicle:start:02:15,high>>\nA cold wind moves through the alley.", { state, actionCount: 1, storyCards });
@@ -69,6 +69,31 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(cards[1].description).toContain("\"source\": \"model-signal\"");
     expect(cards[1].description).toContain("\"bootstrapInstructionStatus\": \"appended\"");
     expect(cards[1].description).toContain("\"bootstrapSignalStatus\": \"accepted\"");
+    expect(cards[1].description).toContain("\"contextCue\": \"Deep-night cue.\"");
+  });
+
+  it("uses opening history for the automatic-clock fallback when the bootstrap tag is absent", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [{ keys: "chronicle-configuration", entry: "Chronicle Enabled: true\nInitialization Mode: Automatic\nAI Temporal Signal: true", type: "class", title: "Configure Chronicle" }];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+    const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
+    runtime.onInput("I turn slowly.", { state, actionCount: 1, storyCards });
+    runtime.onContext("Current assembled context.", {
+      state,
+      storyCards,
+      history: [{ rawText: "The sun hangs low, casting long, jagged shadows between abandoned cars.", type: "story" }]
+    });
+    expect(state.chronicleInitialClockCalibration).toMatchObject({ pending: true, source: "scenario-context-rule", hour: 17, minute: 30 });
+    runtime.onOutput("A cold wind moves through the alley.", { state, actionCount: 1, storyCards });
+    const runtimeState = state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number; minute: number } } };
+    expect(runtimeState.chronicleState.currentDateTime).toMatchObject({ hour: 17, minute: 30 });
+    expect(cards[1].description).toContain("\"source\": \"scenario-context-rule\"");
+    expect(cards[1].description).toContain("\"contextCue\": \"Late-afternoon figurative cue.\"");
+    expect(cards[1].description).toContain("\"bootstrapSignalStatus\": \"absent\"");
   });
 
   it("processes an Output through the configured Reasoner and refreshes the Story Card", () => {

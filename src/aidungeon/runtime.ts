@@ -30,7 +30,8 @@ export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
 export const CHRONICLE_RUNTIME_SCHEMA_VERSION = 1;
 export interface ChroniclePersistentRuntimeState { readonly schemaVersion: typeof CHRONICLE_RUNTIME_SCHEMA_VERSION; readonly chronicleState: ChronicleState; readonly ledger: TemporalLedger; readonly pendingPlayerAction: string | undefined; }
-export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly maxChars?: number; readonly memoryLength?: number; readonly storyCards?: StoryCardRuntime; }
+export interface AIDungeonHistoryEntry { readonly text?: unknown; readonly rawText?: unknown; readonly type?: unknown; }
+export interface AIDungeonHookContext { readonly state: Record<string, unknown>; readonly actionCount?: number; readonly maxChars?: number; readonly memoryLength?: number; readonly history?: readonly AIDungeonHistoryEntry[]; readonly storyCards?: StoryCardRuntime; }
 export interface ChronicleRuntime {
   onInput(text: string, context: AIDungeonHookContext): string;
   onContext(text: string, context: AIDungeonHookContext): string;
@@ -101,7 +102,7 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       }
       const initialCalibration = readInitialClockCalibration(context.state);
       if (initialCalibration?.pending === true) {
-        const fallback = inferInitialClockFromContext(text, current.chronicleState.currentDateTime);
+        const fallback = inferInitialClockFromContext(initialCalibrationEvidence(text, context.history), current.chronicleState.currentDateTime);
         if (!configuration.aiTemporalSignal) {
           writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, contextCue: fallback.evidence, bootstrapInstructionStatus: "not-requested", bootstrapSignalStatus: "not-requested" }));
           current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
@@ -308,6 +309,16 @@ function writeSignalDiagnostic(state: Record<string, unknown>, diagnostic: Chron
 
 function previousSignalWasAbsent(state: Record<string, unknown>): boolean {
   return readSignalDiagnostic(state)?.outputSignalStatus === "absent";
+}
+
+/** Opening history often carries the Scenario kickstart while Context `text` does not. */
+function initialCalibrationEvidence(text: string, history: readonly AIDungeonHistoryEntry[] | undefined): string {
+  if (history === undefined) return text;
+  const opening = history.slice(0, 12).map((entry) => {
+    if (typeof entry.rawText === "string") return entry.rawText;
+    return typeof entry.text === "string" ? entry.text : "";
+  }).filter((entry) => entry.length > 0);
+  return [text, ...opening].join("\n");
 }
 
 function readInitialClockCalibration(state: Record<string, unknown>): InitialClockCalibration | undefined {

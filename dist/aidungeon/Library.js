@@ -1154,7 +1154,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     { pattern: /\bearly morning\b|\bdark morning\b|\bmorning mist\b/, hour: 7, minute: 0, evidence: "Early-morning cue." },
     { pattern: /\blate morning\b/, hour: 10, minute: 30, evidence: "Late-morning cue." },
     { pattern: /\b(?:noon|midday|high noon)\b/, hour: 12, minute: 0, evidence: "Noon cue." },
-    { pattern: /\b(?:late afternoon|lengthening shadows|sun hung low|golden hour)\b/, hour: 17, minute: 30, evidence: "Late-afternoon figurative cue." },
+    { pattern: /\b(?:late afternoon|lengthening shadows|sun hangs? low|golden hour)\b/, hour: 17, minute: 30, evidence: "Late-afternoon figurative cue." },
     { pattern: /\b(?:sunset|dusk|twilight)\b|\bsky (?:burns|glows) (?:orange|red|gold)\b/, hour: 18, minute: 30, evidence: "Sunset/dusk cue." },
     { pattern: /\b(?:evening|nightfall|after dark)\b|\bstreets? (?:glow|shine) with neon\b/, hour: 20, minute: 0, evidence: "Evening cue." },
     { pattern: /\b(?:moonlight only|stars? (?:blanket|fill) the sky|moon hangs high)\b/, hour: 22, minute: 0, evidence: "Night-sky figurative cue." },
@@ -1208,7 +1208,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
         }
         const initialCalibration = readInitialClockCalibration(context.state);
         if ((initialCalibration == null ? void 0 : initialCalibration.pending) === true) {
-          const fallback = inferInitialClockFromContext(text, current.chronicleState.currentDateTime);
+          const fallback = inferInitialClockFromContext(initialCalibrationEvidence(text, context.history), current.chronicleState.currentDateTime);
           if (!configuration.aiTemporalSignal) {
             writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, contextCue: fallback.evidence, bootstrapInstructionStatus: "not-requested", bootstrapSignalStatus: "not-requested" }));
             current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
@@ -1363,6 +1363,14 @@ ${CHRONICLE_SIGNAL_BLOCK_END}`;
   function previousSignalWasAbsent(state) {
     var _a;
     return ((_a = readSignalDiagnostic(state)) == null ? void 0 : _a.outputSignalStatus) === "absent";
+  }
+  function initialCalibrationEvidence(text, history) {
+    if (history === void 0) return text;
+    const opening = history.slice(0, 12).map((entry) => {
+      if (typeof entry.rawText === "string") return entry.rawText;
+      return typeof entry.text === "string" ? entry.text : "";
+    }).filter((entry) => entry.length > 0);
+    return [text, ...opening].join("\n");
   }
   function readInitialClockCalibration(state) {
     const value = state[CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY];

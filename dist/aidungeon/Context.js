@@ -34,6 +34,7 @@ var modifier = (value) => {
     actionCount,
     maxChars,
     memoryLength,
+    history: Array.isArray(history) ? history : void 0,
     storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
   });
   return { text: result };

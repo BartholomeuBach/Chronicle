@@ -4,6 +4,7 @@ import type { AiDungeonStoryCard } from "./story-cards/chronicle-story-card.js";
 
 declare const text: unknown;
 declare const state: unknown;
+declare const history: unknown;
 declare const info: { actionCount?: number; maxChars?: number; memoryLength?: number } | undefined;
 declare const storyCards: AiDungeonStoryCard[] | undefined;
 declare const addStoryCard: ((keys: string, entry: string, type: string) => number | false) | undefined;
@@ -28,6 +29,7 @@ const modifier = (value: unknown) => {
     actionCount,
     maxChars,
     memoryLength,
+    history: Array.isArray(history) ? history : undefined,
     storyCards: usableStoryCardGlobals(storyCards, addStoryCard, updateStoryCard, removeStoryCard)
   });
   return { text: result };
