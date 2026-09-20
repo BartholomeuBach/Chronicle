@@ -85,23 +85,31 @@ function findExplicitClock(text: string): { readonly hour: number; readonly minu
   }
   const twentyFourHour = /\b(?:at|around|about)\s+([01]?\d|2[0-3]):([0-5]\d)\b/.exec(text);
   if (twentyFourHour !== null) return { hour: Number(twentyFourHour[1]), minute: Number(twentyFourHour[2]), evidence: `Explicit 24-hour clock: ${twentyFourHour[0].trim()}.` };
+  const clockReading = /\b(?:the )?(?:clock|watch|phone|computer|dashboard|display)\s+(?:reads?|shows?|says?)\s+([01]?\d|2[0-3]):([0-5]\d)\b/.exec(text);
+  if (clockReading !== null) return { hour: Number(clockReading[1]), minute: Number(clockReading[2]), evidence: `Explicit clock reading: ${clockReading[0].trim()}.` };
   return undefined;
 }
 
 const INITIAL_TIME_CUES: readonly { readonly pattern: RegExp; readonly hour: number; readonly minute: number; readonly evidence: string }[] = [
-  { pattern: /\b(?:deep|dead|middle) (?:in|of) (?:the )?night\b|\bwitching hour\b|\bwee hours\b/, hour: 2, minute: 0, evidence: "Deep-night cue." },
-  { pattern: /\bmidnight\b|\bstroke of twelve\b/, hour: 0, minute: 0, evidence: "Midnight cue." },
-  { pattern: /\b(?:first light|daybreak|break of day|dawn|sunrise)\b|\bfirst rays? of (?:the )?sun\b/, hour: 6, minute: 0, evidence: "Dawn/sunrise cue." },
-  { pattern: /\bearly morning\b|\bdark morning\b|\bmorning mist\b/, hour: 7, minute: 0, evidence: "Early-morning cue." },
-  { pattern: /\blate morning\b/, hour: 10, minute: 30, evidence: "Late-morning cue." },
-  { pattern: /\b(?:noon|midday|high noon)\b/, hour: 12, minute: 0, evidence: "Noon cue." },
-  { pattern: /\b(?:late afternoon|lengthening shadows|sun hangs? low|golden hour)\b/, hour: 17, minute: 30, evidence: "Late-afternoon figurative cue." },
-  { pattern: /\b(?:sunset|dusk|twilight)\b|\bsky (?:burns|glows) (?:orange|red|gold)\b/, hour: 18, minute: 30, evidence: "Sunset/dusk cue." },
-  { pattern: /\b(?:evening|nightfall|after dark)\b|\bstreets? (?:glow|shine) with neon\b/, hour: 20, minute: 0, evidence: "Evening cue." },
-  { pattern: /\b(?:moonlight only|stars? (?:blanket|fill) the sky|moon hangs high)\b/, hour: 22, minute: 0, evidence: "Night-sky figurative cue." },
-  { pattern: /\bafternoon\b/, hour: 15, minute: 0, evidence: "Afternoon cue." },
-  { pattern: /\bmorning\b/, hour: 8, minute: 0, evidence: "Morning cue." },
-  { pattern: /\bnight\b/, hour: 21, minute: 0, evidence: "Generic night cue." }
+  // Specific terms must stay before broad ones: the first match wins.
+  { pattern: /\b(?:at|just after|just before|near|around) midnight\b|\bstroke of (?:midnight|twelve)\b|\btwelve o'?clock at night\b/, hour: 0, minute: 0, evidence: "Midnight cue." },
+  { pattern: /\b(?:deep|dead|middle) (?:in|of) (?:the )?night\b|\bwitching hour\b|\bwee hours\b|\bsmall hours\b|\b(?:well )?past midnight\b|\bnocturnal hours\b/, hour: 2, minute: 0, evidence: "Deep-night cue." },
+  { pattern: /\b(?:pre[- ]?dawn|before dawn|before daybreak|last watch|darkest (?:part|hour) of (?:the )?night)\b|\bnight (?:was )?at (?:its )?darkest\b|\bthe world (?:was )?still asleep\b/, hour: 4, minute: 30, evidence: "Pre-dawn cue." },
+  { pattern: /\b(?:first light|daybreak|break of day|dawn|sunrise|sunup)\b|\bfirst (?:rays?|light) (?:of|from) (?:the )?sun\b|\bsun (?:breaks|break|peeks?|crests?|rises?|rose) (?:over|above|through)\b|\b(?:rooster|cock) (?:crows?|crowed)\b/, hour: 6, minute: 0, evidence: "Dawn/sunrise cue." },
+  { pattern: /\b(?:early|dark|chilly|crisp|misty|foggy) morning\b|\bmorning (?:mist|fog|dew|chill)\b|\bthe day (?:has )?(?:barely |just )?begun\b|\b(?:shops?|cafes?|markets?) (?:are )?(?:just )?opening\b|\bcommuters? (?:begin|beginning|start|starting)\b/, hour: 7, minute: 0, evidence: "Early-morning cue." },
+  { pattern: /\b(?:mid[- ]?morning|breakfast time|after breakfast)\b|\bmorning (?:sun|light) (?:spills?|streamed|filters?|filtered)\b|\b(?:school|work)day (?:has )?(?:just )?started\b/, hour: 9, minute: 30, evidence: "Mid-morning cue." },
+  { pattern: /\b(?:late morning|nearing noon|approaching noon|almost noon)\b|\bthe morning (?:is|was) (?:nearly |almost )?over\b|\bbrunch time\b/, hour: 10, minute: 30, evidence: "Late-morning cue." },
+  { pattern: /\b(?:just )?after noon\b|\bearly afternoon\b|\bthe heat of (?:the )?(?:day|afternoon)\b|\b(?:lunch|the midday meal) (?:is|was) over\b/, hour: 13, minute: 30, evidence: "Early-afternoon cue." },
+  { pattern: /\b(?:late afternoon|late day|toward evening|close of day|end of (?:the )?day)\b|\b(?:lengthening|long|elongated) shadows\b|\bshadows? (?:stretch|stretched|creep|crept) (?:across|over)\b|\bthe sun (?:hangs?|hung|sits?|sat) low\b|\bthe sun (?:is|was) sinking\b|\b(?:golden|magic) hour\b|\bafternoon (?:is|was) waning\b/, hour: 17, minute: 30, evidence: "Late-afternoon figurative cue." },
+  { pattern: /\b(?:noon|midday|high noon|twelve o'?clock)\b|\bthe sun (?:is|was) (?:directly )?(?:overhead|at its zenith)\b|\b(?:lunch|lunchtime)\b/, hour: 12, minute: 0, evidence: "Noon cue." },
+  { pattern: /\b(?:mid[- ]?afternoon|afternoon)\b|\bthe day (?:drags?|wears?) on\b|\b(?:classes?|the workday) (?:are|is) (?:still )?in session\b/, hour: 15, minute: 0, evidence: "Afternoon cue." },
+  { pattern: /\bblue hour\b|\bjust after sunset\b|\bearly evening\b|\b(?:streetlights?|lamps?|city lights?) (?:flicker|flickered|come|came) (?:on|alive)\b|\bthe sky (?:is|was) (?:deep )?blue\b/, hour: 19, minute: 30, evidence: "Early-evening cue." },
+  { pattern: /\b(?:sunset|sundown|dusk|twilight|gloaming|eventide)\b|\bthe sun (?:sets?|set|dips?|dipped|slips?|slipped) (?:below|behind|under)\b|\bsky (?:burns?|burned|glows?|glowed|blushes?|blushed) (?:orange|red|gold|pink|purple)\b|\bdaylight (?:fades?|faded|bleeds? away)\b/, hour: 18, minute: 30, evidence: "Sunset/dusk cue." },
+  { pattern: /\b(?:evening|nightfall|after dark|night has fallen)\b|\b(?:dinner|supper) time\b|\bthe (?:streets?|city) (?:glow|glows|shine|shines) with neon\b|\bwindows? (?:glow|glowed) warmly\b/, hour: 20, minute: 0, evidence: "Evening cue." },
+  { pattern: /\b(?:nighttime|at night|the night)\b|\b(?:moonlight|moonlit)\b|\bstars? (?:blanket|fill|prick|studded|studded) the sky\b|\bthe moon (?:hangs?|hung|is|was) (?:high|low|overhead)\b|\bthe (?:streets?|roads?) (?:are|were) deserted\b/, hour: 22, minute: 0, evidence: "Night-sky cue." },
+  { pattern: /\b(?:late night|near dawn|the night is young|after hours)\b|\bthe last train\b|\bbars? (?:are|were) closing\b|\bthe city (?:never sleeps|has gone quiet)\b/, hour: 23, minute: 0, evidence: "Late-night cue." },
+  { pattern: /\b(?:morning)\b/, hour: 8, minute: 0, evidence: "Generic morning cue." },
+  { pattern: /\b(?:night)\b/, hour: 21, minute: 0, evidence: "Generic night cue." }
 ];
 
 function isClockPart(value: unknown, maximum: number): value is number {

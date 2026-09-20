@@ -23,6 +23,37 @@ describe("initial clock calibration", () => {
     expect(inferInitialClockFromContext("The streets glow with neon.", automatic)).toMatchObject({ hour: 20, minute: 0 });
   });
 
+  it.each([
+    ["At the stroke of midnight, the vault door opens.", 0, 0],
+    ["The witching hour settles over the village.", 2, 0],
+    ["The world is still asleep before daybreak.", 4, 30],
+    ["First light spills over the mountains.", 6, 0],
+    ["The rooster crows as the sun crests the ridge.", 6, 0],
+    ["Morning mist clings to the empty road.", 7, 0],
+    ["The shops are just opening for the day.", 7, 0],
+    ["After breakfast, morning light filters through the blinds.", 9, 30],
+    ["It is nearing noon; the morning is nearly over.", 10, 30],
+    ["The sun is directly overhead at high noon.", 12, 0],
+    ["Lunch is over and the heat of the afternoon presses down.", 13, 30],
+    ["The workday is still in session in mid-afternoon.", 15, 0],
+    ["Long shadows creep across the street as the afternoon wanes.", 17, 30],
+    ["The sky blushes pink and daylight fades.", 18, 30],
+    ["Streetlights flicker on in the blue hour.", 19, 30],
+    ["It is dinner time; windows glow warmly in the evening.", 20, 0],
+    ["Moonlight fills the deserted streets.", 22, 0],
+    ["The bars are closing in the late night.", 23, 0]
+  ])("infers a representative conventional or figurative cue: %s", (context, hour, minute) => {
+    expect(inferInitialClockFromContext(context, automatic)).toMatchObject({
+      source: "scenario-context-rule", hour, minute
+    });
+  });
+
+  it("accepts explicit clock displays even when narration also has a broad cue", () => {
+    expect(inferInitialClockFromContext("At dusk, the computer display reads 03:17.", automatic)).toMatchObject({
+      source: "scenario-context-rule", hour: 3, minute: 17
+    });
+  });
+
   it("keeps the automatic clock when the kickstart gives no defensible cue", () => {
     expect(inferInitialClockFromContext("A locked crate rests beside the door.", automatic)).toMatchObject({
       source: "automatic-clock", hour: 15, minute: 42
