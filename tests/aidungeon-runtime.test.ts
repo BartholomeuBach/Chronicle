@@ -44,6 +44,31 @@ describe("Phase 0 AI Dungeon runtime boundary", () => {
     expect(state.chronicleSignalDiagnostic).toMatchObject({ protocolStatus: "omitted-context-limit" });
   });
 
+  it("uses an AI-first bootstrap tag for Automatic initialization and preserves the automatic date", () => {
+    const state: Record<string, unknown> = {};
+    const cards: AiDungeonStoryCard[] = [{
+      keys: "chronicle-configuration",
+      entry: "Chronicle Enabled: true\nInitialization Mode: Automatic\nAI Temporal Signal: true",
+      type: "class",
+      title: "Configure Chronicle"
+    }];
+    const storyCards: StoryCardRuntime = {
+      storyCards: cards,
+      addStoryCard(keys, entry, type) { cards.push({ keys, entry, type }); return cards.length - 1; },
+      updateStoryCard(index, keys, entry, type) { cards[index] = { ...cards[index], keys, entry, type }; }
+    };
+    const runtime = createChronicleRuntime(ruleBasedTemporalReasoner);
+    runtime.onInput("I listen for movement.", { state, actionCount: 1, storyCards });
+    const bootstrap = runtime.onContext("It was deep in the night.", { state, storyCards });
+    expect(bootstrap).toContain("CHRONICLE INITIAL CLOCK - REQUIRED");
+    expect(bootstrap).not.toContain("Current story time:");
+    const result = runtime.onOutput("<<chronicle:start:02:15,high>>\nA cold wind moves through the alley.", { state, actionCount: 1, storyCards });
+    expect(result).toBe("A cold wind moves through the alley.");
+    const runtimeState = state.chronicleRuntime as { chronicleState: { currentDateTime: { hour: number; minute: number } } };
+    expect(runtimeState.chronicleState.currentDateTime).toMatchObject({ hour: 2, minute: 15 });
+    expect(cards[1].description).toContain("\"source\": \"model-signal\"");
+  });
+
   it("processes an Output through the configured Reasoner and refreshes the Story Card", () => {
     const state: Record<string, unknown> = {};
     initializeChronicleRuntime(state, initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 19, minute: 32, second: 0 }));

@@ -27,6 +27,8 @@ The exact player-action/output transcript for each `beatId` must be captured bef
 
 ## Still to validate in AI Dungeon
 
+* Automatic initialization bootstrap: the first Context requests `<<chronicle:start:HH:MM,...>>` without exposing a provisional clock; the first Output should remove that tag, retain the automatic date, and use its hour/minute.
+* Automatic initialization fallback: when the bootstrap tag is absent, direct and figurative kickstart cues should choose a coherent clock; no cue should preserve the automatic hour/minute.
 * The narrator reliably emits the temporal protocol on ordinary turns.
 * Explicit time skips produce the specified delta.
 * Pure observations (checking a clock, reading a screen, looking around) remain at zero elapsed time.

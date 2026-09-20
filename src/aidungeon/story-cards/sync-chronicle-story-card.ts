@@ -7,6 +7,7 @@ import {
 import type { TemporalLedger } from "../../chronicle/ledger/temporal-ledger.js";
 import type { ChronicleState } from "../../chronicle/state/chronicle-state.js";
 import type { ChronicleSignalDiagnostic } from "../chronicle-signal-diagnostic.js";
+import type { InitialClockCalibration } from "../initial-clock-calibration.js";
 
 /** Narrow shape of documented Story Card functions used by the adapter. */
 export interface StoryCardRuntime {
@@ -39,9 +40,10 @@ export function syncChronicleStoryCard(
   state: ChronicleState,
   ledger: TemporalLedger,
   options: ChronicleStoryCardSyncOptions = {},
-  signalDiagnostic?: ChronicleSignalDiagnostic
+  signalDiagnostic?: ChronicleSignalDiagnostic,
+  initialClockCalibration?: InitialClockCalibration
 ): ChronicleStoryCardSyncResult {
-  const projection = createChronicleStoryCardProjection(state, ledger, signalDiagnostic);
+  const projection = createChronicleStoryCardProjection(state, ledger, signalDiagnostic, initialClockCalibration);
   const matchingIndices = findChronicleStoryCardIndices(runtime.storyCards);
   const existingIndex = matchingIndices[0];
 

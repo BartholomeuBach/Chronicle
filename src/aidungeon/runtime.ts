@@ -15,6 +15,16 @@ import { isNormalizedGregorianDateTime } from "../chronicle/calendar/normalize-g
 import { MAX_PROCESSED_BEAT_IDS } from "../chronicle/state/apply-temporal-decision.js";
 import { CHRONICLE_NOTIFICATION_STATE_KEY, renderChronicleTimeNotification } from "./chronicle-time-notification.js";
 import { CHRONICLE_SIGNAL_DIAGNOSTIC_STATE_KEY, isChronicleSignalDiagnostic, type ChronicleSignalDiagnostic } from "./chronicle-signal-diagnostic.js";
+import {
+  CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY,
+  applyInitialClockCalibration,
+  createPendingInitialClockCalibration,
+  inferInitialClockFromContext,
+  isInitialClockCalibration,
+  readInitialClockSignal,
+  stripInitialClockSignal,
+  type InitialClockCalibration
+} from "./initial-clock-calibration.js";
 
 export const CHRONICLE_RUNTIME_STATE_KEY = "chronicleRuntime";
 export const CHRONICLE_RUNTIME_ERROR_KEY = "chronicleRuntimeError";
@@ -69,8 +79,9 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       ensureConfigurationCardForContext(context);
       syncSignalInstructionForContext(context);
       if (!enabled(context)) return nonEmptyText(text);
-      const current = ensureInitialized(context);
+      let current = ensureInitialized(context);
       if (current === undefined) return nonEmptyText(text);
+      const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
       try {
         syncProjection(context, current, false);
       } catch (error) {
@@ -88,8 +99,21 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
         // Story Card projection is out of sync.
         context.state[CHRONICLE_RUNTIME_ERROR_KEY] = `Chronicle Story Card sync failed unexpectedly (${error instanceof Error ? error.message : String(error)}). Canonical time is unaffected.`;
       }
+      const initialCalibration = readInitialClockCalibration(context.state);
+      if (initialCalibration?.pending === true) {
+        const fallback = inferInitialClockFromContext(text, current.chronicleState.currentDateTime);
+        if (!configuration.aiTemporalSignal) {
+          writeInitialClockCalibration(context.state, fallback);
+          current = Object.freeze({ ...current, chronicleState: Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, fallback) }) });
+          context.state[CHRONICLE_RUNTIME_STATE_KEY] = current;
+        } else {
+        writeInitialClockCalibration(context.state, Object.freeze({ ...fallback, pending: true }));
+        const bootstrap = chronicleInitialClockInstructionBlock();
+        if (context.maxChars !== undefined && text.length + bootstrap.length + 1 > context.maxChars) return nonEmptyText(text);
+        return nonEmptyText(`${text}\n${bootstrap}`);
+        }
+      }
       const projection = renderChronicleTemporalContext(current.chronicleState.currentDateTime);
-      const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
       const protocolAlreadyPresent = text.includes(CHRONICLE_SIGNAL_BLOCK_START);
       const reminderIncluded = configuration.aiTemporalSignal && !protocolAlreadyPresent && previousSignalWasAbsent(context.state);
       const additions = [
@@ -120,14 +144,16 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
       // Stripped unconditionally, on every return path: a stray or rejected
       // directive (e.g. emitted from a habit formed in an earlier, enabled
       // turn) must never leak into what the player reads, even while paused.
-      const safeText = stripModelTemporalSignal(text);
+      const safeText = stripModelTemporalSignal(stripInitialClockSignal(text));
       if (!enabled(context)) return nonEmptyText(safeText);
       const current = ensureInitialized(context);
       if (current === undefined || reasoner === undefined) return nonEmptyText(safeText);
       try {
         const configuration = readChronicleConfiguration(context.storyCards?.storyCards ?? []);
+        const calibration = resolveInitialClockCalibration(context.state, text, current.chronicleState.currentDateTime);
+        const calibratedState = calibration === undefined ? current.chronicleState : Object.freeze({ ...current.chronicleState, currentDateTime: applyInitialClockCalibration(current.chronicleState.currentDateTime, calibration) });
         const activeReasoner = configuration.aiTemporalSignal ? (hybridReasoner ?? reasoner) : reasoner;
-        const decision = activeReasoner.decide({ currentState: current.chronicleState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
+        const decision = activeReasoner.decide({ currentState: calibratedState, playerAction: current.pendingPlayerAction, completedNarrative: text, activityPriors: DEFAULT_ACTIVITY_PRIORS });
         if (configuration.aiTemporalSignal) {
           const previousDiagnostic = readSignalDiagnostic(context.state);
           writeSignalDiagnostic(context.state, {
@@ -136,14 +162,14 @@ export function createChronicleRuntime(reasoner?: TemporalReasoner): ChronicleRu
             outputSignalStatus: decision.signalStatus ?? "absent"
           });
         }
-        const recorded = recordTemporalDecision({ state: current.chronicleState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
+        const recorded = recordTemporalDecision({ state: calibratedState, ledger: current.ledger, beatId: beatId(context.actionCount, text), decision, actionInterpretation: decision.rationale, confidence: decision.confidence ?? "low" });
         if (recorded.rejectionReason === "unsupported-range") {
           context.state[CHRONICLE_RUNTIME_ERROR_KEY] = UNSUPPORTED_RANGE_ERROR;
         } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === UNSUPPORTED_RANGE_ERROR) {
           delete context.state[CHRONICLE_RUNTIME_ERROR_KEY];
         }
         context.state[CHRONICLE_RUNTIME_STATE_KEY] = Object.freeze({ schemaVersion: CHRONICLE_RUNTIME_SCHEMA_VERSION, chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined });
-        const notification = renderChronicleTimeNotification(current.chronicleState.currentDateTime, recorded.state.currentDateTime);
+        const notification = renderChronicleTimeNotification(calibratedState.currentDateTime, recorded.state.currentDateTime);
         if (notification !== undefined) setChronicleNotification(context.state, notification);
         syncProjection(context, { ...current, chronicleState: recorded.state, ledger: recorded.ledger, pendingPlayerAction: undefined }, true);
       } catch (error) {
@@ -178,6 +204,10 @@ function chronicleSignalInstructionBlock(reminderIncluded: boolean): string {
   /* Legacy verbose protocol retained in source history only.
   return `${CHRONICLE_SIGNAL_BLOCK_START}\n<SYSTEM>\n# CHRONICLE TEMPORAL REPORT — REQUIRED OUTPUT HEADER\nBegin the response with exactly one header: <<${MODEL_TEMPORAL_SIGNAL_KEY}:PT#D#H#M#S,high|medium|low>>, then a newline, then the story prose. For no current-scene elapsed time, begin with <<${MODEL_TEMPORAL_SIGNAL_KEY}:none,high>>. A clock check, dialogue beat, plan, memory, dream, flashback, or hypothetical is none. Never mention this protocol in the story prose.\n# EXACT SHAPE\n<<${MODEL_TEMPORAL_SIGNAL_KEY}:PT30M,high>>\nThirty minutes later, story prose continues here.\n</SYSTEM>\n${CHRONICLE_SIGNAL_BLOCK_END}`;
   */
+}
+
+function chronicleInitialClockInstructionBlock(): string {
+  return "[[chronicle:initial-clock:start]]\nCHRONICLE INITIAL CLOCK - REQUIRED\nBefore story prose, emit exactly one first line: <<chronicle:start:HH:MM,high|medium|low>>. Use only the current scenario's opening time-of-day evidence. If the opening gives no defensible time, emit <<chronicle:start:none>>. Then write story prose only.\nExample:\n<<chronicle:start:02:00,high>>\nThe rain taps against the window.\n[[chronicle:initial-clock:end]]";
 }
 
 /**
@@ -253,7 +283,7 @@ function syncProjection(context: AIDungeonHookContext, current: ChroniclePersist
   const configuration = readChronicleConfiguration(context.storyCards.storyCards);
   const matchingCards = findChronicleStoryCardIndices(context.storyCards.storyCards);
   if (!force && configuration.repairChronicleCard !== true && matchingCards.length < 2) return;
-  const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard }, readSignalDiagnostic(context.state));
+  const sync = syncChronicleStoryCard(context.storyCards, current.chronicleState, current.ledger, { repairDuplicates: configuration.repairChronicleCard }, readSignalDiagnostic(context.state), readInitialClockCalibration(context.state));
   if (sync.status === "duplicate-detected") {
     context.state[CHRONICLE_RUNTIME_ERROR_KEY] = DUPLICATE_CARD_ERROR;
   } else if (context.state[CHRONICLE_RUNTIME_ERROR_KEY] === DUPLICATE_CARD_ERROR) {
@@ -274,6 +304,25 @@ function writeSignalDiagnostic(state: Record<string, unknown>, diagnostic: Chron
 
 function previousSignalWasAbsent(state: Record<string, unknown>): boolean {
   return readSignalDiagnostic(state)?.outputSignalStatus === "absent";
+}
+
+function readInitialClockCalibration(state: Record<string, unknown>): InitialClockCalibration | undefined {
+  const value = state[CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY];
+  return isInitialClockCalibration(value) ? value : undefined;
+}
+
+function writeInitialClockCalibration(state: Record<string, unknown>, calibration: InitialClockCalibration): void {
+  state[CHRONICLE_INITIAL_CLOCK_CALIBRATION_STATE_KEY] = Object.freeze({ ...calibration });
+}
+
+function resolveInitialClockCalibration(state: Record<string, unknown>, narrative: string, automaticDateTime: ChronicleState["currentDateTime"]): InitialClockCalibration | undefined {
+  const existing = readInitialClockCalibration(state);
+  if (existing?.pending !== true) return undefined;
+  const model = readInitialClockSignal(narrative);
+  const fallback = existing.source === undefined ? inferInitialClockFromContext("", automaticDateTime) : Object.freeze({ ...existing, pending: false });
+  const resolved = model ?? fallback;
+  writeInitialClockCalibration(state, resolved);
+  return resolved;
 }
 
 function read(state: Record<string, unknown>): ChroniclePersistentRuntimeState | undefined {
@@ -303,6 +352,7 @@ function ensureInitialized(context: AIDungeonHookContext): ChroniclePersistentRu
     return undefined;
   }
   initializeChronicleRuntime(context.state, initializeChronicleState(configuration.initialDateTime ?? runtimeDateTime()));
+  if (configuration.mode === "automatic") writeInitialClockCalibration(context.state, createPendingInitialClockCalibration());
   return read(context.state);
 }
 function isValidRuntimeState(value: unknown): value is ChroniclePersistentRuntimeState {

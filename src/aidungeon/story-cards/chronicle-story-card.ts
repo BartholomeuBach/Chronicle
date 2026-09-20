@@ -3,6 +3,7 @@ import { formatChronicleDateTime } from "../../chronicle/state/format-chronicle-
 import { renderChronicleTemporalContext } from "../../chronicle/state/render-chronicle-temporal-context.js";
 import type { ChronicleState } from "../../chronicle/state/chronicle-state.js";
 import type { ChronicleSignalDiagnostic } from "../chronicle-signal-diagnostic.js";
+import type { InitialClockCalibration } from "../initial-clock-calibration.js";
 
 /** Legacy/reserved identifier kept in `keys` so pre-existing cards are still discoverable by fallback. */
 export const CHRONICLE_STORY_CARD_KEY = "chronicle-temporal-state";
@@ -48,7 +49,7 @@ export function renderChronicleStoryCardEntry(state: ChronicleState): string {
  * Renders an inspectable projection for Story Card Notes. `description` is a
  * community-observed mapping and must be validated in a real AI Dungeon app.
  */
-export function renderChronicleStoryCardNotes(ledger: TemporalLedger, signalDiagnostic?: ChronicleSignalDiagnostic): string {
+export function renderChronicleStoryCardNotes(ledger: TemporalLedger, signalDiagnostic?: ChronicleSignalDiagnostic, initialClockCalibration?: InitialClockCalibration): string {
   const records = ledger.records.slice(-MAX_STORY_CARD_LEDGER_RECORDS).map(renderLedgerRecord);
   return JSON.stringify(
     {
@@ -56,7 +57,8 @@ export function renderChronicleStoryCardNotes(ledger: TemporalLedger, signalDiag
         schemaVersion: 1,
         records
       },
-      chronicleSignalDiagnostic: signalDiagnostic
+      chronicleSignalDiagnostic: signalDiagnostic,
+      chronicleInitialClockCalibration: initialClockCalibration
     },
     null,
     2
@@ -66,14 +68,15 @@ export function renderChronicleStoryCardNotes(ledger: TemporalLedger, signalDiag
 export function createChronicleStoryCardProjection(
   state: ChronicleState,
   ledger: TemporalLedger,
-  signalDiagnostic?: ChronicleSignalDiagnostic
+  signalDiagnostic?: ChronicleSignalDiagnostic,
+  initialClockCalibration?: InitialClockCalibration
 ): ChronicleStoryCardProjection {
   return Object.freeze({
     keys: CHRONICLE_STORY_CARD_KEY,
     title: CHRONICLE_STORY_CARD_TITLE,
     entry: renderChronicleStoryCardEntry(state),
     type: CHRONICLE_STORY_CARD_TYPE,
-    notes: renderChronicleStoryCardNotes(ledger, signalDiagnostic)
+    notes: renderChronicleStoryCardNotes(ledger, signalDiagnostic, initialClockCalibration)
   });
 }
 
