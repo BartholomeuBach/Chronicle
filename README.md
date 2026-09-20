@@ -26,14 +26,15 @@ LLMs are great at writing scenes.
 
 They are much less reliable at maintaining systems over long stories.
 
-Time gets confused. Goals disappear. Consequences are forgotten. Characters suddenly know things they should not know. A two-day deadline somehow becomes tomorrow, then next week, then apparently never happened.
+Time gets confused. Space gets confused. Goals disappear. Consequences are forgotten. Characters suddenly know things they should not know, or turn up in rooms they never entered. A two-day deadline somehow becomes tomorrow, then next week, then apparently never happened.
 
 The Narrative System Engine is an attempt to give those systems an actual persistent state.
 
-Chronicle begins with time.
+Chronicle begins with time. Locus is next, and it begins with space.
 
 Future modules may handle things such as:
 
+- 📍 **Locus — Space Tracker** — where the scene is happening, and who is in it
 - 🎲 **Agency & Outcome** — intentions, attempts, success, failure, and consequences
 - 📜 **Quest Manager** — objectives, progress, deadlines, completion, and failure
 - ❤️ **Bonds** — relationships and evolving character dynamics
