@@ -43,9 +43,7 @@ describe("Temporal Reasoner narrative regression corpus", () => {
     ["3 days later, the ship reaches the harbor.", { elapsedTime: { days: 3 }, mode: "explicit-duration" }],
     ["Após 40 minutos, ele alcança a mata.", { elapsedTime: { minutes: 40 }, mode: "explicit-duration" }],
     ["Por 30 minutos, eles caminham em silêncio.", { elapsedTime: { minutes: 30 }, mode: "explicit-duration" }],
-    ["By sunset, the road finally ends.", { elapsedTime: { hours: 19, minutes: 30 }, mode: "explicit-transition" }],
     ["At sunrise, the camp awakens.", { elapsedTime: { hours: 7, minutes: 30 }, mode: "explicit-transition" }],
-    ["Night fell over the valley.", { elapsedTime: { hours: 22, minutes: 30 }, mode: "explicit-transition" }],
     ["Throughout the night, rain batters the roof.", { elapsedTime: { hours: 8 }, mode: "summary-or-time-skip" }],
     ["Later, the inn door opens.", { elapsedTime: { minutes: 5 }, mode: "conservative-fallback" }],
     ["They walked through the crowded market.", { elapsedTime: { minutes: 1 }, mode: "scene-progression" }],
@@ -55,5 +53,11 @@ describe("Temporal Reasoner narrative regression corpus", () => {
 
   it.each(currentNarrativeCases)("advances for current narrative evidence: %s", (completedNarrative, expected) => {
     expect(decide(completedNarrative)).toMatchObject(expected);
+  });
+
+  // The default clock here is 22:30, so these targets are 19h30 and 22h30 away: too far to be the next
+  // step of the scene. Both used to advance the clock by that much on a single descriptive phrase.
+  it.each(["By sunset, the road finally ends.", "Night fell over the valley."])("does not skip most of a day for a distant named transition: %s", (completedNarrative) => {
+    expect(decide(completedNarrative)).toMatchObject({ elapsedTime: { days: 0, hours: 0, minutes: 0, seconds: 0 }, mode: "conservative-fallback", hasTemporalEvidence: false });
   });
 });

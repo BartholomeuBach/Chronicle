@@ -48,7 +48,10 @@
     if (explicit !== void 0) return decision(explicit, "explicit-duration", "Explicit elapsed duration in completed narrative.", "high", true);
     const transitionHour = findTransitionHour(narrative);
     if (transitionHour !== void 0) {
-      return decision(untilHour(input.currentState.currentDateTime, transitionHour), "explicit-transition", "Completed narrative establishes a named time-of-day transition.", "medium");
+      const secondsToTarget = secondsUntilHour(input.currentState.currentDateTime, transitionHour);
+      if (secondsToTarget <= MAX_TRANSITION_SECONDS) {
+        return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: secondsToTarget }), "explicit-transition", "Completed narrative establishes a named time-of-day transition.", "medium");
+      }
     }
     if (/(durante a noite|throughout the night|passou a noite|overnight)/.test(narrative)) {
       return decision(createElapsedTime({ days: 0, hours: 8, minutes: 0, seconds: 0 }), "summary-or-time-skip", "Completed narrative summarizes an overnight passage.", "medium");
@@ -141,11 +144,11 @@
     if (/(at nightfall|night fell|ao anoitecer|nightfall came)/.test(text)) return 21;
     return void 0;
   }
-  function untilHour(dateTime, targetHour) {
+  var MAX_TRANSITION_SECONDS = 12 * 3600;
+  function secondsUntilHour(dateTime, targetHour) {
     const now = dateTime.hour * 3600 + dateTime.minute * 60 + dateTime.second;
     const target = targetHour * 3600;
-    const remaining = now <= target ? target - now : 86400 - now + target;
-    return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: remaining });
+    return now <= target ? target - now : 86400 - now + target;
   }
   function decision(elapsedTime, mode, rationale, confidence, hasTemporalEvidence = elapsedTime.days !== 0 || elapsedTime.hours !== 0 || elapsedTime.minutes !== 0 || elapsedTime.seconds !== 0) {
     return Object.freeze({ elapsedTime, mode, rationale, confidence, hasTemporalEvidence });

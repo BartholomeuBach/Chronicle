@@ -4,7 +4,34 @@ import { initializeChronicleState } from "../../../src/chronicle/state/index.js"
 
 const decide = (narrative: string, action?: string, priors: readonly ActivityPrior[] = []) => ruleBasedTemporalReasoner.decide({ currentState: initializeChronicleState({ year: 2026, month: 4, day: 13, hour: 22, minute: 30, second: 0 }), playerAction: action, completedNarrative: narrative, activityPriors: priors });
 
+const decideAt = (hour: number, minute: number, narrative: string) => ruleBasedTemporalReasoner.decide({ currentState: initializeChronicleState({ year: 2026, month: 4, day: 13, hour, minute, second: 0 }), playerAction: undefined, completedNarrative: narrative, activityPriors: [] });
+const NO_TIME = { elapsedTime: { days: 0, hours: 0, minutes: 0, seconds: 0 }, hasTemporalEvidence: false };
+
 describe("ruleBasedTemporalReasoner", () => {
+  describe("named time-of-day transitions are capped at 12h", () => {
+    // Evidence (2026-09-20, run against the built scripts): the same phrases used descriptively moved the
+    // clock by up to a day. The genuine case (waking after a night's sleep) is well inside the cap.
+    it.each([
+      [23, 0, "You woke up, stiff and cold.", { hours: 7 }],
+      [21, 30, "You woke up to grey light at the window.", { hours: 8, minutes: 30 }],
+      [8, 0, "By noon, the market is full.", { hours: 4 }],
+      [15, 0, "At sunset, the ferry leaves.", { hours: 3 }],
+      [18, 0, "You woke up.", { hours: 12 }]
+    ])("credits a plausible next step at %i:%i: %s", (hour, minute, narrative, elapsed) => {
+      expect(decideAt(hour, minute, narrative)).toMatchObject({ elapsedTime: elapsed, mode: "explicit-transition" });
+    });
+
+    it.each([
+      [14, 0, "You woke up with a start, heart pounding."],
+      [7, 0, "Morning came softly over the hills."],
+      [21, 30, "Night fell over the harbor as the guards changed shifts."],
+      [14, 0, "The note read: meet me at noon by the fountain."],
+      [17, 59, "You woke up."]
+    ])("does not skip toward the next day at %i:%i: %s", (hour, minute, narrative) => {
+      expect(decideAt(hour, minute, narrative)).toMatchObject({ ...NO_TIME, mode: "conservative-fallback" });
+    });
+  });
+
   it("gives explicit durations highest priority", () => {
     expect(decide("Depois de 2 horas, ele chega.")).toMatchObject({ elapsedTime: { hours: 2 }, mode: "explicit-duration", confidence: "high" });
     expect(decide("After 0 minutes, he arrives.")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "explicit-duration", hasTemporalEvidence: true });
@@ -42,7 +69,8 @@ describe("ruleBasedTemporalReasoner", () => {
   });
 
   it("handles named day transitions and does not treat intention as completion", () => {
-    expect(decide("By sunset, the road finally ends.")).toMatchObject({ elapsedTime: { hours: 19, minutes: 30 }, mode: "explicit-transition" });
+    expect(decide("By sunset, the road finally ends.")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" }); // 19h30 away from 22:30: too far to credit
+    expect(decideAt(15, 0, "By sunset, the road finally ends.")).toMatchObject({ elapsedTime: { hours: 3 }, mode: "explicit-transition" });
     expect(decide("He lies down, but cannot sleep.", "I am going to sleep now")).toMatchObject({ elapsedTime: { minutes: 0 }, mode: "conservative-fallback" });
   });
 

@@ -14,7 +14,13 @@ function decide(input: TemporalReasonerInput): TemporalReasonerDecision {
 
   const transitionHour = findTransitionHour(narrative);
   if (transitionHour !== undefined) {
-    return decision(untilHour(input.currentState.currentDateTime, transitionHour), "explicit-transition", "Completed narrative establishes a named time-of-day transition.", "medium");
+    const secondsToTarget = secondsUntilHour(input.currentState.currentDateTime, transitionHour);
+    // A named transition is only credited when the target is a plausible next step. Past the
+    // cap the phrase is descriptive ("You woke up", "Night fell over the harbor") and falls
+    // through to the remaining rules instead of skipping most of a day.
+    if (secondsToTarget <= MAX_TRANSITION_SECONDS) {
+      return decision(createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: secondsToTarget }), "explicit-transition", "Completed narrative establishes a named time-of-day transition.", "medium");
+    }
   }
   if (/(durante a noite|throughout the night|passou a noite|overnight)/.test(narrative)) {
     return decision(createElapsedTime({ days: 0, hours: 8, minutes: 0, seconds: 0 }), "summary-or-time-skip", "Completed narrative summarizes an overnight passage.", "medium");
@@ -220,17 +226,28 @@ function findTransitionHour(text: string): number | undefined {
 }
 
 /**
+ * Longest jump a single named time-of-day phrase may cause. Verified against
+ * the built scripts (2026-09-20): without a cap, descriptive uses of the same
+ * phrases moved the clock by up to a day ("You woke up" from a 14:00 nap went
+ * to 06:00 the next day, "Night fell over the harbor" at 21:30 added 23.5h).
+ * The genuine case these phrases exist for is waking after a night's sleep
+ * (23:00 to 06:00 is 7h), which fits well inside 12h. The value is a judgment,
+ * not a measurement.
+ */
+const MAX_TRANSITION_SECONDS = 12 * 3_600;
+
+/**
  * Seconds remaining until targetHour. Uses `<=`, not `<`: when the current
  * time already exactly equals the target hour, this must resolve to 0, not
  * wrap forward a full 24h to "the next occurrence" (a confirmed bug, fixed
  * 2026-09-15 — "You woke up." at exactly 06:00:00 previously advanced to
- * the next day instead of staying put).
+ * the next day instead of staying put). Any wrapped result is still subject
+ * to MAX_TRANSITION_SECONDS at the call site.
  */
-function untilHour(dateTime: TemporalReasonerInput["currentState"]["currentDateTime"], targetHour: number): ElapsedTime {
+function secondsUntilHour(dateTime: TemporalReasonerInput["currentState"]["currentDateTime"], targetHour: number): number {
   const now = dateTime.hour * 3_600 + dateTime.minute * 60 + dateTime.second;
   const target = targetHour * 3_600;
-  const remaining = now <= target ? target - now : 86_400 - now + target;
-  return createElapsedTime({ days: 0, hours: 0, minutes: 0, seconds: remaining });
+  return now <= target ? target - now : 86_400 - now + target;
 }
 
 function decision(elapsedTime: ElapsedTime, mode: TemporalReasonerDecision["mode"], rationale: string, confidence: "high" | "medium" | "low", hasTemporalEvidence = elapsedTime.days !== 0 || elapsedTime.hours !== 0 || elapsedTime.minutes !== 0 || elapsedTime.seconds !== 0): TemporalReasonerDecision {

@@ -132,7 +132,23 @@ function check(name, actual, expected) {
   check("bootstrap: the narrator's hour and minute are applied", /\d{4}-\d{2}-\d{2} 19:30/.test(clock(session)), true);
 }
 
+// --- A descriptive time-of-day phrase must not skip most of a day --------------
+// Both with and without the AI signal: a narrator that omits its tag is the common live case.
+for (const signal of [false, true]) {
+  const clockAfter = (hour, minute, reply) => {
+    const session = newSession({ signal, hour, minute });
+    playTurn(session, "> You continue.", reply, 1);
+    return clock(session);
+  };
+  const label = `signal ${signal ? "on, tag absent" : "off"}`;
+  check(`transition (${label}): waking from a nap stays put`, clockAfter(14, 0, "You woke up with a start, heart pounding."), "2026-04-13 14:00");
+  check(`transition (${label}): a descriptive 'Night fell' stays put`, clockAfter(21, 30, "Night fell over the harbor as the guards changed shifts."), "2026-04-13 21:30");
+  check(`transition (${label}): a descriptive 'morning came' stays put`, clockAfter(7, 0, "The fog lifts and morning came softly over the hills."), "2026-04-13 07:00");
+  check(`transition (${label}): waking after a night's sleep still reaches morning`, clockAfter(23, 0, "You woke up, stiff and cold."), "2026-04-14 06:00");
+}
+
 if (failures.length > 0) {
+
   console.error(`dist behavior check failed (${failures.length} of ${failures.length + passed}):\n`);
   for (const failure of failures) console.error(`  - ${failure}\n`);
   process.exit(1);

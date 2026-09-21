@@ -45,6 +45,24 @@ Neither record used the narrator temporal signal, and the observed action intend
 
 The exact player-action/output transcript for each `beatId` must be captured before changing a matcher. Without it, the specific activity prior that matched is only an inference.
 
+## QA review — 2026-09-20 (simulator evidence, not live)
+
+Method: the exact `dist/aidungeon/*.js` files were run hook by hook (Input, Context, Output) against fake sandbox globals. This is now a permanent gate, `npm run verify:dist:behavior`, part of `npm run check`. It models the platform; it cannot show how the real AI Dungeon treats Undo, Retry, or Continue.
+
+### Fixed
+
+* **Bootstrap answer leaked to the player.** The bootstrap prompt asks the narrator to write `none,high>>` when uncertain, but Output only stripped numeric clock answers, so `none,high>>` was shown on the first turn of an Automatic story. It is now stripped.
+* **Near-miss control markers leaked.** `<<Chronicle:...>>`, single-bracket `<chronicle:...>`, and a directive truncated at the end of the output are now removed. They are never read as evidence: only the exact `<<chronicle:...>>` form is.
+* **A descriptive time-of-day phrase could skip most of a day.** "woke up" and "morning came" (target 06:00), "at noon", "at sunset" and "night fell" resolved to the *next* occurrence of their hour. Observed: "You woke up" at 14:00 went to 06:00 the next day; "Night fell over the harbor" at 21:30 added 23.5h; "morning came" at 07:00 added 23h. This path stays active when the narrator omits its tag, which is the common live case. A named transition is now credited only when its target is at most 12h ahead (waking after a night's sleep, 23:00 to 06:00, is 7h). The 12h cap is a judgment, not a measurement. Residual limit: a plan such as "meet me at noon" at 07:00 still advances 5h.
+
+### Observed, not fixed yet (each needs a real corpus before any rule changes)
+
+* **The narrator tag is often discarded by the whole-beat guard.** A valid `<<chronicle:PT2H,high>>` was rejected in 6 of 9 realistic beats, because of `she says, "..."`, `might`, `plans`, "dreams" as a noun, `had finished`, or `The sign reads "..."`. The guard evaluates the whole beat, so common words silence a good signal.
+* **Retry keeps the first duration.** Retry with the same `actionCount` is not counted twice, but the retry's own duration is ignored ("first one wins").
+* **Undo followed by a new action may lose its time.** If AI Dungeon does not roll back `state` on Undo, the new action reuses the same `actionCount` and is rejected as a duplicate. Whether `state` is rolled back is not yet observed.
+* **Explicit-duration false positives, credited at high confidence:** "the ritual lasts for three days" (+3 days), "open for 24 hours a day" (+24h), "has been waiting for two hours" (+2h), "an overnight bag" (+8h).
+* **Context limit.** When the prompt is near `maxChars`, the clock and the signal request are omitted together, although the clock alone (about 75 characters) would fit. Frequency is unknown: check `chronicleSignalDiagnostic.protocolStatus` for `omitted-context-limit` in a long campaign before changing this.
+
 ## Still to validate in AI Dungeon
 
 * Automatic initialization bootstrap: the first Context requests `<<chronicle:start:HH:MM,...>>` without exposing a provisional clock; the first Output should remove that tag, retain the automatic date, and use its hour/minute.
