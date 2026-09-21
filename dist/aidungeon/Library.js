@@ -863,45 +863,45 @@ Time of day: ${formatChronicleTimeOfDay(dateTime)}.`;
     ].join("\n");
   }
   var CHRONICLE_CONFIGURATION_DEFAULT_ENTRY = renderConfigurationEntry();
-  var CHRONICLE_CONFIGURATION_NOTES = `Chronicle is ready to start. Automatic initialization is already configured --
-you can ignore this card entirely and just play.
-If you want a custom starting date/time instead, switch Initialization Mode to
-Manual and fill in the Start fields below, before playing the first turn.
-Once the story's timeline has initialized, changing Initialization Mode or the
-Start fields again will not reset the active story clock -- they are only
-read once, the very first time, and are ignored after that by design.
-#
-# Chronicle keeps a private in-story calendar and estimates how much time
-# passes during each turn. This card lets you configure it; you don't need to
-# know anything about AI Dungeon's scripting API to use it.
-#
-# Edit the fields in this card's Entry (not this Notes text) to change
-# settings:
-#
-# - Chronicle Enabled: set to false to pause Chronicle without losing its
-#   saved timeline. Stays effective any time you change it, before or after
-#   the timeline has started.
-# - Initialization Mode: "Automatic" starts the story clock from the
-#   current real-world New York date/time as a convenience seed (the
-#   in-story time itself stays fictional and timezone-free afterward).
-#   Set to "Manual" to instead choose your own starting date/time below.
-#   Only read once, the first time the timeline initializes.
-# - Start Year / Month / Day / Hour / Minute / Second: only used when
-#   Initialization Mode is "Manual", and only the first time the timeline
-#   initializes. Leave any of them blank to fall back to the current New
-#   York value for that field.
-# - AI Temporal Signal: when true (recommended), the AI Dungeon narrator
-#   itself reports how much time each reply covers, and Chronicle
-#   cross-checks that against its own rules. Set to false to use only
-#   Chronicle's built-in rules. Stays effective any time you change it.
-# - Repair Chronicle Card: set to true only if Chronicle reports duplicate
-#   "Chronicle Temporal State" cards, to remove the extras. Set it back to
-#   false afterward; it is a one-time action, not a persistent mode.
-#
-# Troubleshooting: if Chronicle stops updating time, check that
-# "Chronicle Enabled" is true above and that no other card also uses the
-# name "Configure Chronicle". If you see an error mentioning duplicate
-# cards, set "Repair Chronicle Card" to true for one turn.`;
+  var CHRONICLE_CONFIGURATION_NOTES = `CHRONICLE - QUICK START
+Nothing to set up. Just play.
+Chronicle starts its clock on its own.
+
+Want your own starting date and time?
+Edit the Entry of this card (not this Notes text),
+set Initialization Mode to Manual and fill in the
+Start fields. Do it before the first turn.
+
+SETTINGS (edit them in the Entry)
+
+Chronicle Enabled
+  false pauses Chronicle. Your clock is kept.
+
+Initialization Mode
+  Automatic: date from today's New York date. The
+  hour comes from the opening scene when it gives a
+  clue ("dusk", a clock), otherwise from New York.
+  Manual: you choose it with the Start fields.
+  Read only once, before the first turn.
+
+Start Year / Month / Day / Hour / Minute / Second
+  Manual mode only. A blank field uses New York.
+
+AI Temporal Signal
+  Optional. The narrator may report elapsed time.
+  Chronicle keeps the clock without it.
+
+Repair Chronicle Card
+  Only for a duplicate-cards error. Set true for
+  one turn, then back to false.
+
+TROUBLESHOOTING
+- Time not moving? Check Chronicle Enabled is true
+  and that only one card is named "Configure Chronicle".
+- The first turn creates this card. The second turn
+  starts the clock.
+- History of time changes: Notes of the card
+  "Chronicle Temporal State".`;
   var DISABLED_DEFAULT = Object.freeze({ enabled: false, mode: "automatic", repairChronicleCard: false, aiTemporalSignal: true });
   function findChronicleConfigurationCardIndex(storyCards) {
     const byTitle = storyCards.findIndex((card) => normalizedTitle2(card.title) === CHRONICLE_CONFIGURATION_TITLE.toLowerCase());
@@ -976,7 +976,7 @@ read once, the very first time, and are ignored after that by design.
   }
   function isKnownNotesTemplate(description) {
     const trimmed = (description != null ? description : "").trim();
-    return trimmed === "" || trimmed.startsWith("# Chronicle") || trimmed.startsWith("Chronicle is ready to start");
+    return trimmed === "" || trimmed.startsWith("# Chronicle") || trimmed.startsWith("Chronicle is ready to start") || trimmed.startsWith("CHRONICLE - QUICK START");
   }
   function buildConfiguration(values, currentDateTime) {
     var _a, _b, _c, _d;

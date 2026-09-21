@@ -69,14 +69,30 @@ describe("Chronicle Configuration Story Card: reading settings", () => {
   });
   it("reads an explicit duplicate-card repair request, and the Notes stay documentation-only", () => {
     expect(readChronicleConfiguration([canonicalCard("Repair Chronicle Card: true")])).toMatchObject({ repairChronicleCard: true });
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("will not reset the active story clock");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Read only once, before the first turn");
     expect(CHRONICLE_CONFIGURATION_NOTES).not.toContain("Chronicle Enabled: false"); // no settings values leak into Notes
   });
-  it("communicates the ready-to-start, edit-before-the-first-turn framing in Notes and Entry", () => {
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Chronicle is ready to start");
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Automatic initialization is already configured");
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("before playing the first turn");
-    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("will not reset the active story clock");
+  it("never lets the Notes text be read as a setting", () => {
+    // parseLines treats "<key>: <value>" as a setting, so no Notes line may start with a recognized key and a colon.
+    const settingsFromNotes = readChronicleConfiguration([{ ...canonicalCard(""), description: CHRONICLE_CONFIGURATION_NOTES }]);
+    expect(settingsFromNotes).toEqual({ enabled: true, mode: "automatic", repairChronicleCard: false, aiTemporalSignal: true });
+    for (const line of CHRONICLE_CONFIGURATION_NOTES.split(/\r?\n/)) {
+      expect(line).not.toMatch(/^\s*(chronicle enabled|initialization mode|start (year|month|day|hour|minute|second)|ai temporal signal|repair chronicle card)\s*:/i);
+    }
+  });
+  it("still refreshes a card carrying the previous template but keeps a creator's custom Notes", () => {
+    const previous = canonicalCard("Chronicle Enabled: true", "Chronicle is ready to start. Automatic initialization is already configured --");
+    ensureChronicleConfigurationCard(fakeRuntime([previous]));
+    expect(previous.description).toBe(CHRONICLE_CONFIGURATION_NOTES);
+    const custom = canonicalCard("Chronicle Enabled: true", "My own notes.");
+    ensureChronicleConfigurationCard(fakeRuntime([custom]));
+    expect(custom.description).toBe("My own notes.");
+  });
+  it("communicates the quick-start, edit-before-the-first-turn framing in Notes and Entry", () => {
+    expect(CHRONICLE_CONFIGURATION_NOTES.startsWith("CHRONICLE - QUICK START")).toBe(true);
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Nothing to set up. Just play.");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Do it before the first turn.");
+    expect(CHRONICLE_CONFIGURATION_NOTES).toContain("Chronicle keeps the clock without it.");
     expect(CHRONICLE_CONFIGURATION_DEFAULT_ENTRY).toContain("Choose your starting mode before playing the first turn");
     expect(CHRONICLE_CONFIGURATION_DEFAULT_ENTRY).toContain("Used only when Initialization Mode is Manual");
   });
