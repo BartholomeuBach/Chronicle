@@ -95,6 +95,17 @@ describe("Model temporal signal (D-026, Cenário 1)", () => {
     expect(stripModelTemporalSignal("<<chronicle:PT1H>> and <<chronicle:PT2H>>")).toBe("and");
   });
 
+  it("also strips near-miss control markers, without ever reading them as evidence", () => {
+    expect(stripModelTemporalSignal("<<Chronicle:PT30M,high>>\nThey talk.")).toBe("They talk.");
+    expect(stripModelTemporalSignal("<chronicle:PT30M,high>\nThey talk.")).toBe("They talk.");
+    expect(stripModelTemporalSignal("<<chronicle:PT30M,high>\nThey talk.")).toBe("They talk.");
+    expect(stripModelTemporalSignal("They talk. <<chronicle:PT30")).toBe("They talk.");
+    expect(stripModelTemporalSignal("<<chronicle:start:14:3")).toBe("");
+    expect(readModelTemporalSignal("<chronicle:PT30M,high>\nThey talk.")).toMatchObject({ status: "rejected", reason: "absent" });
+    // Ordinary prose that only resembles the marker is preserved.
+    expect(stripModelTemporalSignal("He read the chronicle: a long tale.")).toBe("He read the chronicle: a long tale.");
+  });
+
   it("leaves text without any directive unchanged", () => {
     expect(stripModelTemporalSignal("The door creaks open.")).toBe("The door creaks open.");
   });

@@ -478,7 +478,10 @@
   var LENIENT_DURATION_PATTERN = /^(?:(\d{1,4})w)?(?:(\d{1,4})d)?(?:(\d{1,3})h)?(?:(\d{1,3})m)?(?:(\d{1,3})s)?$/i;
   var CONFIDENCE_TOKENS = ["high", "medium", "low"];
   function directivePattern() {
-    return /<<chronicle:([^>]{1,60})>>/g;
+    return /<<chronicle:([^>]{1,60})>>/gi;
+  }
+  function strayMarkerPatterns() {
+    return [/<{1,2}chronicle:[^>\n]{1,60}>{1,2}/gi, /<{1,2}chronicle:[^>\n]{0,60}$/i];
   }
   function findAllDirectives(narrative) {
     const pattern = directivePattern();
@@ -541,8 +544,11 @@
     return CONFIDENCE_TOKENS.includes(normalized) ? normalized : void 0;
   }
   function stripModelTemporalSignal(narrative) {
-    if (!directivePattern().test(narrative)) return narrative;
-    return narrative.replace(directivePattern(), "").replace(/[ \t]{2,}/g, " ").trim();
+    const hasMarker = directivePattern().test(narrative) || strayMarkerPatterns().some((pattern) => pattern.test(narrative));
+    if (!hasMarker) return narrative;
+    let stripped = narrative.replace(directivePattern(), "");
+    for (const pattern of strayMarkerPatterns()) stripped = stripped.replace(pattern, "");
+    return stripped.replace(/[ \t]{2,}/g, " ").trim();
   }
 
   // src/chronicle/reasoning/hybrid-temporal-reasoner.ts
@@ -1126,7 +1132,7 @@ Story time: ${formatChronicleDateTime(next)}.`;
     return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${((_a = parsed[3]) != null ? _a : "medium").toLowerCase()} confidence).`) });
   }
   function stripInitialClockSignal(text) {
-    return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*\d{1,2}:\d{2}(?:,(?:high|medium|low))?>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
+    return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*(?:none|\d{1,2}:\d{2})(?:\s*,\s*[a-z]{1,10})?\s*>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
   }
   function applyInitialClockCalibration(dateTime, calibration) {
     if (calibration.hour === void 0 || calibration.minute === void 0) return dateTime;

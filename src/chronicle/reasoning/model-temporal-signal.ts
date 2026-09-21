@@ -54,7 +54,17 @@ function directivePattern(): RegExp {
   // Captures anything up to the next ">>" (not just an allow-listed character set) so a
   // near-miss attempt (stray punctuation, an unrecognized confidence word, ...) is still
   // found and classified as malformed, instead of silently vanishing as "absent".
-  return /<<chronicle:([^>]{1,60})>>/g;
+  return /<<chronicle:([^>]{1,60})>>/gi;
+}
+
+/**
+ * Strip-only patterns for near-miss shapes a narrator may emit (single angle
+ * brackets, or a directive cut off by the token limit). They are removed so a
+ * control marker never reaches the player, but they are deliberately NOT read
+ * as a signal: only the exact `<<chronicle:...>>` form is evidence.
+ */
+function strayMarkerPatterns(): readonly RegExp[] {
+  return [/<{1,2}chronicle:[^>\n]{1,60}>{1,2}/gi, /<{1,2}chronicle:[^>\n]{0,60}$/i];
 }
 
 /** ES2018-safe equivalent of String.prototype.matchAll (added in ES2020). */
@@ -148,6 +158,9 @@ function parseConfidence(raw: string | undefined): ModelSignalConfidence | undef
 export function stripModelTemporalSignal(narrative: string): string {
   // Identity pass-through in the common case (no directive at all) so this
   // never trims or reformats ordinary narrative text unnecessarily.
-  if (!directivePattern().test(narrative)) return narrative;
-  return narrative.replace(directivePattern(), "").replace(/[ \t]{2,}/g, " ").trim();
+  const hasMarker = directivePattern().test(narrative) || strayMarkerPatterns().some((pattern) => pattern.test(narrative));
+  if (!hasMarker) return narrative;
+  let stripped = narrative.replace(directivePattern(), "");
+  for (const pattern of strayMarkerPatterns()) stripped = stripped.replace(pattern, "");
+  return stripped.replace(/[ \t]{2,}/g, " ").trim();
 }

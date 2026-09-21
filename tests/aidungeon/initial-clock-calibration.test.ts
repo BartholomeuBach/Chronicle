@@ -71,6 +71,16 @@ describe("initial clock calibration", () => {
     expect(inspectInitialClockSignal("<<chronicle:start:25:00>>")).toMatchObject({ status: "malformed" });
   });
 
+  it("strips the 'none' completion the bootstrap prompt itself asks for when uncertain", () => {
+    for (const control of ["none,high>>", "none>>", "None, medium >>", "22:15,low>>", "9:05>>", "12:00,unsure>>"]) {
+      expect(stripInitialClockSignal(`${control}\nThe alley smells of rain.`)).toBe("The alley smells of rain.");
+    }
+    // Only a leading control line is removed; prose that merely mentions such text is untouched.
+    expect(stripInitialClockSignal("The sign said none,high>> in chalk.")).toBe("The sign said none,high>> in chalk.");
+    expect(stripInitialClockSignal("None of them moved.")).toBe("None of them moved.");
+    expect(inspectInitialClockSignal("none,high>>\nStory.")).toMatchObject({ status: "absent" });
+  });
+
   it("changes only the time of the automatic date", () => {
     const calibration = readInitialClockSignal("<<chronicle:start:02:15,high>>")!;
     expect(applyInitialClockCalibration(automatic, calibration)).toEqual({ year: 2026, month: 9, day: 19, hour: 2, minute: 15, second: 0 });

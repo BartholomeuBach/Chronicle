@@ -63,8 +63,14 @@ export function inspectInitialClockSignal(text: string): { readonly status: Init
   return Object.freeze({ status: "accepted", calibration: complete("model-signal", Number(parsed[1]), Number(parsed[2]), `Narrator bootstrap signal (${(parsed[3] ?? "medium").toLowerCase()} confidence).`) });
 }
 
+/**
+ * Removes every form of the bootstrap control line before the player reads it.
+ * The prefill instruction itself tells the narrator to answer `none,high>>`
+ * when uncertain, so that completion must be stripped exactly like `HH:MM,...>>`
+ * (verified against the built Output script: it previously reached the player).
+ */
 export function stripInitialClockSignal(text: string): string {
-  return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*\d{1,2}:\d{2}(?:,(?:high|medium|low))?>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
+  return text.replace(/<<chronicle:start:[^>]{1,24}>>/gi, "").replace(/^\s*(?:none|\d{1,2}:\d{2})(?:\s*,\s*[a-z]{1,10})?\s*>>\s*/i, "").replace(/[ \t]{2,}/g, " ").trim();
 }
 
 export function applyInitialClockCalibration(dateTime: ChronicleDateTime, calibration: InitialClockCalibration): ChronicleDateTime {
